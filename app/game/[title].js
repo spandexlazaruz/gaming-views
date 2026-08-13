@@ -5,13 +5,13 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { colors, PLATFORMS, posterThemes, hashStr } from '../../lib/theme';
 import { GAMES } from '../../lib/games';
 import { daysUntil, formatDate, MONTH_NAMES } from '../../lib/dates';
-import { useWatchlist } from '../../lib/WatchlistContext';
+import { useWatchlist, LEAD_OPTIONS } from '../../lib/WatchlistContext';
 import GameCard from '../../components/GameCard';
 
 export default function GameDetailScreen() {
   const { title } = useLocalSearchParams();
   const router = useRouter();
-  const { saved, toggleWatchlist } = useWatchlist();
+  const { saved, toggleWatchlist, reminders, setReminderLead } = useWatchlist();
 
   const game = GAMES.find((g) => g.title === decodeURIComponent(title));
   if (!game) {
@@ -69,6 +69,26 @@ export default function GameDetailScreen() {
             </Text>
           </Pressable>
 
+          {isSaved && (
+            <View style={styles.leadRow}>
+              <Text style={styles.leadLabel}>REMIND ME</Text>
+              <View style={styles.leadChips}>
+                {LEAD_OPTIONS.map((o) => {
+                  const active = (reminders[game.title] || 'release_day') === o.key;
+                  return (
+                    <Pressable
+                      key={o.key}
+                      style={[styles.leadChip, active && styles.leadChipActive]}
+                      onPress={() => setReminderLead(game.title, o.key)}
+                    >
+                      <Text style={[styles.leadChipText, active && styles.leadChipTextActive]}>{o.label}</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </View>
+          )}
+
           <View style={styles.section}>
             <Text style={styles.sectionHead}>ABOUT THIS RELEASE</Text>
             <Text style={styles.blurb}>{blurb} Add it to your watchlist and we'll keep it front and center as the date gets closer.</Text>
@@ -115,6 +135,16 @@ const styles = StyleSheet.create({
   cta: { backgroundColor: colors.orange, borderRadius: 11, padding: 15, alignItems: 'center', marginBottom: 20 },
   ctaSaved: { backgroundColor: 'transparent', borderWidth: 1.5, borderColor: colors.orange },
   ctaText: { fontFamily: 'Poppins_700Bold', fontSize: 14, color: '#1A0F00' },
+  leadRow: { marginTop: -12, marginBottom: 20 },
+  leadLabel: { fontSize: 11, fontFamily: 'Inter_600SemiBold', color: colors.mutedDim, letterSpacing: 1, marginBottom: 8 },
+  leadChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
+  leadChip: {
+    paddingHorizontal: 11, paddingVertical: 7, borderRadius: 999,
+    backgroundColor: colors.bgCard, borderWidth: 1, borderColor: colors.line,
+  },
+  leadChipActive: { backgroundColor: colors.orange, borderColor: colors.orange },
+  leadChipText: { fontSize: 11.5, fontFamily: 'Inter_600SemiBold', color: colors.muted },
+  leadChipTextActive: { color: '#1A0F00' },
   section: { marginBottom: 22 },
   sectionHead: { fontSize: 11.5, fontFamily: 'Inter_600SemiBold', color: colors.mutedDim, letterSpacing: 1, marginBottom: 10 },
   blurb: { fontSize: 13.5, color: colors.muted, lineHeight: 21, fontFamily: 'Inter_400Regular' },

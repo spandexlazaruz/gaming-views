@@ -27,10 +27,13 @@ export default function RootLayout() {
   return (
     <WatchlistProvider>
       <StatusBar style="light" />
-      <Stack screenOptions={{ headerShown: false }}>
+      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bgPage } }}>
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="game/[title]" options={{ presentation: 'card' }} />
         <Stack.Screen name="search" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="menu" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="settings" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="notifications" options={{ presentation: 'modal' }} />
       </Stack>
     </WatchlistProvider>
   );

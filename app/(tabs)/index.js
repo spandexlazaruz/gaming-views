@@ -53,9 +53,14 @@ export default function CalendarScreen() {
           <Text style={styles.brand}>
             <Text style={{ color: colors.blue }}>GAMING</Text> <Text style={{ color: colors.orange }}>VIEWS</Text>
           </Text>
-          <Pressable style={styles.searchBtn} onPress={() => router.push('/search')}>
-            <Text style={{ fontSize: 15 }}>🔍</Text>
-          </Pressable>
+          <View style={styles.navActions}>
+            <Pressable style={styles.searchBtn} onPress={() => router.push('/search')}>
+              <Text style={{ fontSize: 15 }}>🔍</Text>
+            </Pressable>
+            <Pressable style={styles.searchBtn} onPress={() => router.push('/menu')}>
+              <Text style={{ fontSize: 15 }}>☰</Text>
+            </Pressable>
+          </View>
         </View>
 
         {/* Hero */}
@@ -121,6 +126,7 @@ const styles = StyleSheet.create({
     width: 34, height: 34, borderRadius: 9, backgroundColor: colors.bgCard,
     borderWidth: 1, borderColor: colors.line, alignItems: 'center', justifyContent: 'center',
   },
+  navActions: { flexDirection: 'row', gap: 8 },
   brand: { fontFamily: 'Poppins_800ExtraBold', fontSize: 16 },
   hero: { padding: 20, borderBottomWidth: 1, borderBottomColor: colors.line },
   eyebrow: { color: colors.orange, fontFamily: 'Inter_600SemiBold', fontSize: 12, letterSpacing: 1, marginBottom: 8 },
