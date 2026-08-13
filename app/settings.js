@@ -67,8 +67,12 @@ export default function SettingsScreen() {
             <Text style={styles.aboutLinkText}>Terms of Service</Text>
             <Text style={styles.chev}>›</Text>
           </Pressable>
-          <Pressable style={[styles.aboutLink, { borderBottomWidth: 0 }]}>
+          <Pressable style={styles.aboutLink}>
             <Text style={styles.aboutLinkText}>Send Feedback</Text>
+            <Text style={styles.chev}>›</Text>
+          </Pressable>
+          <Pressable style={[styles.aboutLink, { borderBottomWidth: 0 }]} onPress={() => router.push('/onboarding')}>
+            <Text style={styles.aboutLinkText}>Preview Onboarding</Text>
             <Text style={styles.chev}>›</Text>
           </Pressable>
         </View>

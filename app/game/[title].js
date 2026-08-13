@@ -40,7 +40,13 @@ export default function GameDetailScreen() {
           <Text style={styles.backBtnText}>←</Text>
         </Pressable>
 
-        <LinearGradient colors={theme} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.heroPoster}>
+        <LinearGradient colors={theme} start={{ x: 0.15, y: 0 }} end={{ x: 0.9, y: 1 }} style={styles.heroPoster}>
+          <View style={styles.heroSheen} />
+          <LinearGradient
+            colors={['transparent', 'rgba(0,0,0,0.65)']}
+            start={{ x: 0, y: 0.4 }} end={{ x: 0, y: 1 }}
+            style={StyleSheet.absoluteFill}
+          />
           <Text style={styles.heroPosterTitle}>{game.title}</Text>
           <View style={styles.heroStamp}>
             <Text style={styles.heroStampText}>{stampText}</Text>
@@ -89,6 +95,26 @@ export default function GameDetailScreen() {
             </View>
           )}
 
+          {game.steam && (
+            <View style={styles.section}>
+              <Text style={styles.sectionHead}>ON STEAM</Text>
+              <View style={styles.steamCard}>
+                <Text style={styles.steamCardPrice}>
+                  {game.steam.discountPrice
+                    ? `-${game.steam.discountPct}%   $${game.steam.discountPrice.toFixed(2)}  (was $${game.steam.price.toFixed(2)})`
+                    : `$${game.steam.price.toFixed(2)}`}
+                </Text>
+                {game.steam.deck && (
+                  <View style={[styles.deckBadgeLg, styles[`deckLg_${game.steam.deck}`]]}>
+                    <Text style={[styles.deckBadgeLgText, styles[`deckLgText_${game.steam.deck}`]]}>
+                      DECK {game.steam.deck.toUpperCase()}
+                    </Text>
+                  </View>
+                )}
+              </View>
+            </View>
+          )}
+
           <View style={styles.section}>
             <Text style={styles.sectionHead}>ABOUT THIS RELEASE</Text>
             <Text style={styles.blurb}>{blurb} Add it to your watchlist and we'll keep it front and center as the date gets closer.</Text>
@@ -114,10 +140,21 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
   backBtnText: { color: colors.white, fontSize: 18 },
-  heroPoster: { width: '100%', aspectRatio: 4 / 3, justifyContent: 'flex-end', padding: 20 },
-  heroPosterTitle: { fontFamily: 'Poppins_800ExtraBold', fontSize: 15, color: 'rgba(255,255,255,0.9)', textTransform: 'uppercase' },
+  heroPoster: {
+    width: '100%', aspectRatio: 4 / 3, justifyContent: 'flex-end', padding: 20,
+    borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.08)',
+  },
+  heroSheen: {
+    position: 'absolute', top: -60, left: -80, width: 160, height: 400,
+    backgroundColor: 'rgba(255,255,255,0.05)', transform: [{ rotate: '25deg' }],
+  },
+  heroPosterTitle: {
+    fontFamily: 'Poppins_800ExtraBold', fontSize: 17, color: '#FFFFFF', textTransform: 'uppercase',
+    letterSpacing: 0.3, zIndex: 2,
+    textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 5,
+  },
   heroStamp: {
-    position: 'absolute', top: 60, right: 16,
+    position: 'absolute', top: 60, right: 16, zIndex: 2,
     backgroundColor: colors.orangeDim, borderRadius: 7, paddingHorizontal: 10, paddingVertical: 5,
   },
   heroStampText: { color: colors.orange, fontFamily: 'Inter_600SemiBold', fontSize: 11, textTransform: 'uppercase' },
@@ -148,4 +185,18 @@ const styles = StyleSheet.create({
   section: { marginBottom: 22 },
   sectionHead: { fontSize: 11.5, fontFamily: 'Inter_600SemiBold', color: colors.mutedDim, letterSpacing: 1, marginBottom: 10 },
   blurb: { fontSize: 13.5, color: colors.muted, lineHeight: 21, fontFamily: 'Inter_400Regular' },
+  steamCard: {
+    backgroundColor: colors.bgCard, borderWidth: 1, borderColor: colors.line,
+    borderRadius: 12, padding: 14, flexDirection: 'row', alignItems: 'center',
+    justifyContent: 'space-between', flexWrap: 'wrap', gap: 10,
+  },
+  steamCardPrice: { fontSize: 15, fontFamily: 'Inter_600SemiBold', color: '#66C0F4' },
+  deckBadgeLg: { borderRadius: 6, paddingHorizontal: 9, paddingVertical: 4 },
+  deckBadgeLgText: { fontSize: 10.5, fontFamily: 'Inter_600SemiBold', letterSpacing: 0.3 },
+  deckLg_verified: { backgroundColor: 'rgba(164,208,7,0.16)' },
+  deckLgText_verified: { color: '#A4D007' },
+  deckLg_playable: { backgroundColor: 'rgba(217,180,74,0.16)' },
+  deckLgText_playable: { color: '#D9B44A' },
+  deckLg_unsupported: { backgroundColor: 'rgba(154,161,175,0.14)' },
+  deckLgText_unsupported: { color: colors.mutedDim },
 });

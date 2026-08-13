@@ -14,8 +14,8 @@ function nextRelease() {
 
 export default function CalendarScreen() {
   const router = useRouter();
-  const { saved, toggleWatchlist } = useWatchlist();
-  const [activePlatform, setActivePlatform] = useState('all');
+  const { saved, toggleWatchlist, preferredPlatform } = useWatchlist();
+  const [activePlatform, setActivePlatform] = useState(preferredPlatform);
 
   const hero = useMemo(() => nextRelease(), []);
   const heroDays = daysUntil(hero.date);
@@ -107,7 +107,13 @@ export default function CalendarScreen() {
           {grouped.map((group) => (
             <View key={group.label}>
               <Text style={styles.monthLabel}>{group.label}</Text>
-              {group.games.map((g) => <GameCard key={g.title} game={g} />)}
+              {group.games.map((g) => (
+                <GameCard
+                  key={g.title}
+                  game={g}
+                  highlightPlatform={activePlatform !== 'all' ? activePlatform : undefined}
+                />
+              ))}
             </View>
           ))}
         </View>

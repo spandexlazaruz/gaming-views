@@ -32,6 +32,13 @@ export default function MenuScreen() {
 
       <View style={styles.list}>
         <MenuRow
+          icon="🔗"
+          iconBg="rgba(102,192,244,0.16)"
+          title="LINK YOUR ACCOUNTS"
+          desc="Connect Steam, Xbox, and more."
+          onPress={() => router.push('/accounts')}
+        />
+        <MenuRow
           icon="⚙️"
           iconBg={colors.orangeDim}
           title="SETTINGS"
@@ -46,8 +53,6 @@ export default function MenuScreen() {
           onPress={() => router.push('/notifications')}
         />
       </View>
-
-      <Text style={styles.note}>More here soon — account linking (Steam, Xbox) is still being built.</Text>
     </SafeAreaView>
   );
 }
