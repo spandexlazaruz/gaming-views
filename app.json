@@ -1,0 +1,26 @@
+{
+  "expo": {
+    "name": "Gaming Views",
+    "slug": "gaming-views",
+    "scheme": "gamingviews",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "backgroundColor": "#12161C"
+    },
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.gamingviews.app"
+    },
+    "android": {
+      "package": "com.gamingviews.app",
+      "adaptiveIcon": {
+        "backgroundColor": "#12161C"
+      }
+    },
+    "plugins": ["expo-router"]
+  }
+}

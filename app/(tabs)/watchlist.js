@@ -1,0 +1,56 @@
+import { useMemo } from 'react';
+import { View, Text, ScrollView, Pressable, StyleSheet } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
+import { colors } from '../../lib/theme';
+import { GAMES } from '../../lib/games';
+import { toDate } from '../../lib/dates';
+import { useWatchlist } from '../../lib/WatchlistContext';
+import GameCard from '../../components/GameCard';
+
+export default function WatchlistScreen() {
+  const router = useRouter();
+  const { saved } = useWatchlist();
+
+  const items = useMemo(
+    () => [...saved].map((t) => GAMES.find((g) => g.title === t)).filter(Boolean).sort((a, b) => toDate(a.date) - toDate(b.date)),
+    [saved]
+  );
+
+  return (
+    <SafeAreaView style={styles.container} edges={['top']}>
+      <View style={styles.top}>
+        <Text style={styles.title}>Your Watchlist</Text>
+        <Text style={styles.count}>{saved.size} GAME{saved.size !== 1 ? 'S' : ''}</Text>
+      </View>
+
+      {items.length === 0 ? (
+        <View style={styles.empty}>
+          <Text style={styles.emptyIcon}>🎮</Text>
+          <Text style={styles.emptyTitle}>Your watchlist is empty</Text>
+          <Text style={styles.emptyDesc}>Tap the heart on any game — from the calendar, search, or its detail page — to start tracking it here.</Text>
+          <Pressable style={styles.emptyBtn} onPress={() => router.push('/')}>
+            <Text style={styles.emptyBtnText}>Browse Upcoming Releases</Text>
+          </Pressable>
+        </View>
+      ) : (
+        <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
+          {items.map((g) => <GameCard key={g.title} game={g} />)}
+        </ScrollView>
+      )}
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.bgPage },
+  top: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', padding: 20, paddingBottom: 6 },
+  title: { fontFamily: 'Poppins_800ExtraBold', fontSize: 20, color: colors.white },
+  count: { fontSize: 11.5, color: colors.mutedDim, fontFamily: 'Inter_600SemiBold' },
+  empty: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 30 },
+  emptyIcon: { fontSize: 34, marginBottom: 14 },
+  emptyTitle: { fontFamily: 'Poppins_800ExtraBold', fontSize: 16, color: colors.white, marginBottom: 8 },
+  emptyDesc: { fontSize: 13, color: colors.muted, textAlign: 'center', lineHeight: 20, marginBottom: 20 },
+  emptyBtn: { backgroundColor: colors.orange, borderRadius: 10, paddingVertical: 12, paddingHorizontal: 20 },
+  emptyBtnText: { fontFamily: 'Poppins_700Bold', fontSize: 13, color: '#1A0F00' },
+});
