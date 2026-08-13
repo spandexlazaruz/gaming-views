@@ -30,6 +30,7 @@ export default function RootLayout() {
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="game/[title]" options={{ presentation: 'card' }} />
+        <Stack.Screen name="search" options={{ presentation: 'modal' }} />
       </Stack>
     </WatchlistProvider>
   );

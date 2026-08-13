@@ -53,6 +53,9 @@ export default function CalendarScreen() {
           <Text style={styles.brand}>
             <Text style={{ color: colors.blue }}>GAMING</Text> <Text style={{ color: colors.orange }}>VIEWS</Text>
           </Text>
+          <Pressable style={styles.searchBtn} onPress={() => router.push('/search')}>
+            <Text style={{ fontSize: 15 }}>🔍</Text>
+          </Pressable>
         </View>
 
         {/* Hero */}
@@ -110,7 +113,14 @@ export default function CalendarScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bgPage },
-  nav: { paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: colors.line },
+  nav: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: colors.line,
+  },
+  searchBtn: {
+    width: 34, height: 34, borderRadius: 9, backgroundColor: colors.bgCard,
+    borderWidth: 1, borderColor: colors.line, alignItems: 'center', justifyContent: 'center',
+  },
   brand: { fontFamily: 'Poppins_800ExtraBold', fontSize: 16 },
   hero: { padding: 20, borderBottomWidth: 1, borderBottomColor: colors.line },
   eyebrow: { color: colors.orange, fontFamily: 'Inter_600SemiBold', fontSize: 12, letterSpacing: 1, marginBottom: 8 },
