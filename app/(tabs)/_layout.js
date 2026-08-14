@@ -2,6 +2,7 @@ import { Tabs } from 'expo-router';
 import { Text } from 'react-native';
 import { useWatchlist } from '../../lib/WatchlistContext';
 import { colors } from '../../lib/theme';
+import TopBar from '../../components/TopBar';
 
 function TabIcon({ symbol, focused }) {
   return (
@@ -15,7 +16,8 @@ export default function TabsLayout() {
   return (
     <Tabs
       screenOptions={{
-        headerShown: false,
+        headerShown: true,
+        header: () => <TopBar />,
         tabBarStyle: {
           backgroundColor: colors.bgNav,
           borderTopColor: colors.line,

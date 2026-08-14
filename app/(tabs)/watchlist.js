@@ -1,6 +1,5 @@
 import { useMemo } from 'react';
 import { View, Text, ScrollView, Pressable, StyleSheet } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { colors } from '../../lib/theme';
 import { useGames } from '../../lib/GamesContext';
@@ -19,7 +18,7 @@ export default function WatchlistScreen() {
   );
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <View style={styles.container}>
       <View style={styles.top}>
         <Text style={styles.title}>Your Watchlist</Text>
         <Text style={styles.count}>{saved.size} GAME{saved.size !== 1 ? 'S' : ''}</Text>
@@ -39,7 +38,7 @@ export default function WatchlistScreen() {
           {items.map((g) => <GameCard key={g.title} game={g} />)}
         </ScrollView>
       )}
-    </SafeAreaView>
+    </View>
   );
 }
 

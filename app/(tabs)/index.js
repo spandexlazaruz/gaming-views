@@ -1,6 +1,5 @@
 import { useState, useMemo } from 'react';
 import { View, Text, ScrollView, Pressable, StyleSheet } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { colors, PLATFORMS } from '../../lib/theme';
 import { useGames } from '../../lib/GamesContext';
@@ -47,49 +46,25 @@ export default function CalendarScreen() {
 
   const filterChips = [{ key: 'all', label: 'All' }, ...Object.entries(PLATFORMS).map(([k, v]) => ({ key: k, label: v.label }))];
 
-  const Nav = (
-    <View style={styles.nav}>
-      <Text style={styles.brand}>
-        <Text style={{ color: colors.blue }}>GAMING</Text> <Text style={{ color: colors.orange }}>VIEWS</Text>
-      </Text>
-      <View style={styles.navActions}>
-        <Pressable style={styles.searchBtn} onPress={() => router.push('/search')}>
-          <Text style={{ fontSize: 15 }}>🔍</Text>
-        </Pressable>
-        <Pressable style={styles.searchBtn} onPress={() => router.push('/menu')}>
-          <View style={styles.hamburger}>
-            <View style={styles.hamburgerBar} />
-            <View style={styles.hamburgerBar} />
-            <View style={styles.hamburgerBar} />
-          </View>
-        </Pressable>
-      </View>
-    </View>
-  );
-
   if (loading) {
     return (
-      <SafeAreaView style={styles.container} edges={['top']}>
-        {Nav}
+      <View style={styles.container}>
         <LoadingState label="Loading upcoming releases…" />
-      </SafeAreaView>
+      </View>
     );
   }
 
   if (error) {
     return (
-      <SafeAreaView style={styles.container} edges={['top']}>
-        {Nav}
+      <View style={styles.container}>
         <ErrorState message={error} onRetry={refetch} />
-      </SafeAreaView>
+      </View>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <View style={styles.container}>
       <ScrollView showsVerticalScrollIndicator={false}>
-        {Nav}
-
         {hero && (
           <View style={styles.hero}>
             <Text style={styles.eyebrow}>NEXT UP</Text>
@@ -148,24 +123,12 @@ export default function CalendarScreen() {
           )}
         </View>
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bgPage },
-  nav: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: colors.line,
-  },
-  searchBtn: {
-    width: 34, height: 34, borderRadius: 9, backgroundColor: colors.bgCard,
-    borderWidth: 1, borderColor: colors.line, alignItems: 'center', justifyContent: 'center',
-  },
-  navActions: { flexDirection: 'row', gap: 8 },
-  hamburger: { gap: 3.5, alignItems: 'center' },
-  hamburgerBar: { width: 15, height: 1.6, borderRadius: 1, backgroundColor: colors.white },
-  brand: { fontFamily: 'Poppins_800ExtraBold', fontSize: 16 },
   hero: { padding: 20, borderBottomWidth: 1, borderBottomColor: colors.line },
   eyebrow: { color: colors.orange, fontFamily: 'Inter_600SemiBold', fontSize: 12, letterSpacing: 1, marginBottom: 8 },
   heroTitle: { fontFamily: 'Poppins_800ExtraBold', fontSize: 26, color: colors.white, marginBottom: 8, maxWidth: 320 },
