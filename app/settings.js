@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { View, Text, Pressable, Switch, ScrollView, StyleSheet } from 'react-native';
+import { View, Text, Pressable, Switch, ScrollView, Linking, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { colors } from '../lib/theme';
@@ -25,6 +25,12 @@ export default function SettingsScreen() {
   const router = useRouter();
   const [weeklyDigest, setWeeklyDigest] = useState(false);
   const [priceDrops, setPriceDrops] = useState(true);
+
+  const sendFeedback = () => {
+    const subject = encodeURIComponent('Gaming Views Feedback');
+    const body = encodeURIComponent('\n\n—\nSent from the Gaming Views app (v0.1 · SDK 54)');
+    Linking.openURL(`mailto:gamingviewspodcast@gmail.com?subject=${subject}&body=${body}`).catch(() => {});
+  };
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -67,7 +73,7 @@ export default function SettingsScreen() {
             <Text style={styles.aboutLinkText}>Terms of Service</Text>
             <Text style={styles.chev}>›</Text>
           </Pressable>
-          <Pressable style={styles.aboutLink}>
+          <Pressable style={styles.aboutLink} onPress={sendFeedback}>
             <Text style={styles.aboutLinkText}>Send Feedback</Text>
             <Text style={styles.chev}>›</Text>
           </Pressable>
