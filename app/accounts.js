@@ -3,9 +3,9 @@ import { View, Text, Pressable, ActivityIndicator, ScrollView, StyleSheet } from
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { colors } from '../lib/theme';
+import { useGames } from '../lib/GamesContext';
 import { useWatchlist } from '../lib/WatchlistContext';
 
-const STEAM_WISHLIST_IMPORT = ['Onimusha: Way of the Sword', 'Valheim', 'Enshrouded', 'Phantom Blade Zero'];
 const STEAM_MOCK_USER = 'DanPlaysGames';
 const XBOX_MOCK_GAMERTAG = 'DanPlaysGames';
 
@@ -31,7 +31,13 @@ function AccountRow({ icon, iconBg, name, statusLabel, statusColor, desc, childr
 
 export default function AccountsScreen() {
   const router = useRouter();
+  const { games } = useGames();
   const { saved, toggleWatchlist } = useWatchlist();
+
+  // Pick 4 real, currently-loaded PC titles to stand in for a "Steam wishlist" —
+  // real wishlist import needs the real Steam backend (see roadmap), this is
+  // still the UI mock, just no longer tied to titles that might not exist.
+  const steamWishlistImport = games.filter((g) => g.platforms.includes('pc')).slice(0, 4).map((g) => g.title);
 
   const [steamConnected, setSteamConnected] = useState(false);
   const [steamConnecting, setSteamConnecting] = useState(false);
@@ -45,7 +51,7 @@ export default function AccountsScreen() {
     setTimeout(() => {
       setSteamConnecting(false);
       setSteamConnected(true);
-      STEAM_WISHLIST_IMPORT.forEach((title) => {
+      steamWishlistImport.forEach((title) => {
         if (!saved.has(title)) toggleWatchlist(title);
       });
     }, 1400);
@@ -53,7 +59,7 @@ export default function AccountsScreen() {
 
   const disconnectSteam = () => {
     setSteamConnected(false);
-    STEAM_WISHLIST_IMPORT.forEach((title) => {
+    steamWishlistImport.forEach((title) => {
       if (saved.has(title)) toggleWatchlist(title);
     });
   };
@@ -88,7 +94,7 @@ export default function AccountsScreen() {
           statusColor="#A4D007"
           desc={
             steamConnected
-              ? `Connected as ${STEAM_MOCK_USER} · ${STEAM_WISHLIST_IMPORT.length} games imported.`
+              ? `Connected as ${STEAM_MOCK_USER} · ${steamWishlistImport.length} games imported.`
               : 'Sign in to auto-import your Steam wishlist.'
           }
         >

@@ -3,11 +3,12 @@ import { View, Text, TextInput, ScrollView, Pressable, StyleSheet } from 'react-
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { colors } from '../lib/theme';
-import { GAMES } from '../lib/games';
+import { useGames } from '../lib/GamesContext';
 import GameCard from '../components/GameCard';
 
 export default function SearchScreen() {
   const router = useRouter();
+  const { games } = useGames();
   const [query, setQuery] = useState('');
   const inputRef = useRef(null);
 
@@ -19,10 +20,10 @@ export default function SearchScreen() {
   const results = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return null;
-    return GAMES.filter(
+    return games.filter(
       (g) => g.title.toLowerCase().includes(q) || g.genre.toLowerCase().includes(q)
     );
-  }, [query]);
+  }, [query, games]);
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -47,7 +48,7 @@ export default function SearchScreen() {
 
       <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
         {results === null && (
-          <Text style={styles.hint}>Search across all {GAMES.length} upcoming releases by title or genre.</Text>
+          <Text style={styles.hint}>Search across all {games.length} upcoming releases by title or genre.</Text>
         )}
         {results !== null && results.length === 0 && (
           <Text style={styles.hint}>No matches for "{query}".</Text>

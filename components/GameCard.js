@@ -1,4 +1,4 @@
-import { View, Text, Pressable, StyleSheet } from 'react-native';
+import { View, Text, Pressable, Image, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { colors, PLATFORMS, posterThemes, hashStr } from '../lib/theme';
@@ -25,25 +25,46 @@ export default function GameCard({ game, highlightPlatform }) {
       style={styles.card}
       onPress={() => router.push(`/game/${encodeURIComponent(game.title)}`)}
     >
-      <LinearGradient colors={theme} start={{ x: 0.15, y: 0 }} end={{ x: 0.9, y: 1 }} style={styles.thumb}>
-        <View style={styles.sheen} />
-        <LinearGradient
-          colors={['transparent', 'rgba(0,0,0,0.7)']}
-          start={{ x: 0, y: 0.35 }} end={{ x: 0, y: 1 }}
-          style={StyleSheet.absoluteFill}
-        />
-        <View style={[styles.platTag, { backgroundColor: PLATFORMS[primaryPlat].color }]}>
-          <Text style={styles.platTagText}>{PLATFORMS[primaryPlat].label}</Text>
+      {game.coverUrl ? (
+        <View style={styles.thumb}>
+          <Image source={{ uri: game.coverUrl }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+          <LinearGradient
+            colors={['transparent', 'rgba(0,0,0,0.7)']}
+            start={{ x: 0, y: 0.35 }} end={{ x: 0, y: 1 }}
+            style={StyleSheet.absoluteFill}
+          />
+          <View style={[styles.platTag, { backgroundColor: PLATFORMS[primaryPlat].color }]}>
+            <Text style={styles.platTagText}>{PLATFORMS[primaryPlat].label}</Text>
+          </View>
+          <Pressable
+            style={styles.saveMini}
+            hitSlop={8}
+            onPress={(e) => { e.stopPropagation(); toggleWatchlist(game.title); }}
+          >
+            <Text style={{ fontSize: 12, color: isSaved ? colors.orange : colors.white }}>{isSaved ? '❤️' : '🤍'}</Text>
+          </Pressable>
         </View>
-        <Pressable
-          style={styles.saveMini}
-          hitSlop={8}
-          onPress={(e) => { e.stopPropagation(); toggleWatchlist(game.title); }}
-        >
-          <Text style={{ fontSize: 12, color: isSaved ? colors.orange : colors.white }}>{isSaved ? '❤️' : '🤍'}</Text>
-        </Pressable>
-        <Text numberOfLines={3} style={styles.thumbTitle}>{game.title}</Text>
-      </LinearGradient>
+      ) : (
+        <LinearGradient colors={theme} start={{ x: 0.15, y: 0 }} end={{ x: 0.9, y: 1 }} style={styles.thumb}>
+          <View style={styles.sheen} />
+          <LinearGradient
+            colors={['transparent', 'rgba(0,0,0,0.7)']}
+            start={{ x: 0, y: 0.35 }} end={{ x: 0, y: 1 }}
+            style={StyleSheet.absoluteFill}
+          />
+          <View style={[styles.platTag, { backgroundColor: PLATFORMS[primaryPlat].color }]}>
+            <Text style={styles.platTagText}>{PLATFORMS[primaryPlat].label}</Text>
+          </View>
+          <Pressable
+            style={styles.saveMini}
+            hitSlop={8}
+            onPress={(e) => { e.stopPropagation(); toggleWatchlist(game.title); }}
+          >
+            <Text style={{ fontSize: 12, color: isSaved ? colors.orange : colors.white }}>{isSaved ? '❤️' : '🤍'}</Text>
+          </Pressable>
+          <Text numberOfLines={3} style={styles.thumbTitle}>{game.title}</Text>
+        </LinearGradient>
+      )}
 
       <View style={styles.content}>
         <Text numberOfLines={2} style={styles.title}>{game.title}</Text>

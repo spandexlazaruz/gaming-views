@@ -3,18 +3,19 @@ import { View, Text, ScrollView, Pressable, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { colors } from '../../lib/theme';
-import { GAMES } from '../../lib/games';
+import { useGames } from '../../lib/GamesContext';
 import { toDate } from '../../lib/dates';
 import { useWatchlist } from '../../lib/WatchlistContext';
 import GameCard from '../../components/GameCard';
 
 export default function WatchlistScreen() {
   const router = useRouter();
+  const { games } = useGames();
   const { saved } = useWatchlist();
 
   const items = useMemo(
-    () => [...saved].map((t) => GAMES.find((g) => g.title === t)).filter(Boolean).sort((a, b) => toDate(a.date) - toDate(b.date)),
-    [saved]
+    () => [...saved].map((t) => games.find((g) => g.title === t)).filter(Boolean).sort((a, b) => toDate(a.date) - toDate(b.date)),
+    [saved, games]
   );
 
   return (

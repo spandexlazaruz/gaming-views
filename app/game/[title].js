@@ -1,9 +1,10 @@
-import { View, Text, ScrollView, Pressable, StyleSheet } from 'react-native';
+import { View, Text, ScrollView, Pressable, Image, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { colors, PLATFORMS, posterThemes, hashStr } from '../../lib/theme';
-import { GAMES } from '../../lib/games';
+import { useGames } from '../../lib/GamesContext';
+import { LoadingState } from '../../lib/StateViews';
 import { daysUntil, formatDate, MONTH_NAMES } from '../../lib/dates';
 import { useWatchlist, LEAD_OPTIONS } from '../../lib/WatchlistContext';
 import GameCard from '../../components/GameCard';
@@ -11,9 +12,19 @@ import GameCard from '../../components/GameCard';
 export default function GameDetailScreen() {
   const { title } = useLocalSearchParams();
   const router = useRouter();
+  const { games, loading } = useGames();
   const { saved, toggleWatchlist, reminders, setReminderLead } = useWatchlist();
 
-  const game = GAMES.find((g) => g.title === decodeURIComponent(title));
+  const game = games.find((g) => g.title === decodeURIComponent(title));
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container} edges={['top']}>
+        <LoadingState label="Loading…" />
+      </SafeAreaView>
+    );
+  }
+
   if (!game) {
     return (
       <SafeAreaView style={styles.container}>
@@ -27,7 +38,7 @@ export default function GameDetailScreen() {
   const days = daysUntil(game.date);
   const stampText = days <= 0 ? 'OUT NOW' : days === 1 ? 'RELEASES TOMORROW' : `RELEASES IN ${days} DAYS`;
 
-  const others = GAMES.filter(
+  const others = games.filter(
     (g) => g.title !== game.title && g.date[0] === game.date[0] && g.date[1] === game.date[1]
   ).slice(0, 3);
 
@@ -40,18 +51,32 @@ export default function GameDetailScreen() {
           <Text style={styles.backBtnText}>←</Text>
         </Pressable>
 
-        <LinearGradient colors={theme} start={{ x: 0.15, y: 0 }} end={{ x: 0.9, y: 1 }} style={styles.heroPoster}>
-          <View style={styles.heroSheen} />
-          <LinearGradient
-            colors={['transparent', 'rgba(0,0,0,0.65)']}
-            start={{ x: 0, y: 0.4 }} end={{ x: 0, y: 1 }}
-            style={StyleSheet.absoluteFill}
-          />
-          <Text style={styles.heroPosterTitle}>{game.title}</Text>
-          <View style={styles.heroStamp}>
-            <Text style={styles.heroStampText}>{stampText}</Text>
+        {game.coverUrl ? (
+          <View style={styles.heroPoster}>
+            <Image source={{ uri: game.coverUrl }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+            <LinearGradient
+              colors={['transparent', 'rgba(0,0,0,0.65)']}
+              start={{ x: 0, y: 0.4 }} end={{ x: 0, y: 1 }}
+              style={StyleSheet.absoluteFill}
+            />
+            <View style={styles.heroStamp}>
+              <Text style={styles.heroStampText}>{stampText}</Text>
+            </View>
           </View>
-        </LinearGradient>
+        ) : (
+          <LinearGradient colors={theme} start={{ x: 0.15, y: 0 }} end={{ x: 0.9, y: 1 }} style={styles.heroPoster}>
+            <View style={styles.heroSheen} />
+            <LinearGradient
+              colors={['transparent', 'rgba(0,0,0,0.65)']}
+              start={{ x: 0, y: 0.4 }} end={{ x: 0, y: 1 }}
+              style={StyleSheet.absoluteFill}
+            />
+            <Text style={styles.heroPosterTitle}>{game.title}</Text>
+            <View style={styles.heroStamp}>
+              <Text style={styles.heroStampText}>{stampText}</Text>
+            </View>
+          </LinearGradient>
+        )}
 
         <View style={styles.body}>
           <Text style={styles.title}>{game.title}</Text>

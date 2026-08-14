@@ -3,13 +3,14 @@ import { View, Text, ScrollView, Pressable, Animated, StyleSheet } from 'react-n
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { colors } from '../lib/theme';
-import { GAMES } from '../lib/games';
+import { useGames } from '../lib/GamesContext';
 import { daysUntil } from '../lib/dates';
 import { useWatchlist, LEAD_OPTIONS } from '../lib/WatchlistContext';
 
 export default function NotificationsScreen() {
   const router = useRouter();
   const { saved, reminders } = useWatchlist();
+  const { games } = useGames();
   const slideAnim = useRef(new Animated.Value(-140)).current;
   const [previewGame, setPreviewGame] = useState(null);
   const hideTimer = useRef(null);
@@ -17,7 +18,7 @@ export default function NotificationsScreen() {
   const upcoming = useMemo(() => {
     return [...saved]
       .map((title) => {
-        const game = GAMES.find((g) => g.title === title);
+        const game = games.find((g) => g.title === title);
         if (!game) return null;
         const leadKey = reminders[title] || 'release_day';
         const lead = LEAD_OPTIONS.find((o) => o.key === leadKey);
@@ -26,10 +27,10 @@ export default function NotificationsScreen() {
       })
       .filter(Boolean)
       .sort((a, b) => a.scheduled - b.scheduled);
-  }, [saved, reminders]);
+  }, [saved, reminders, games]);
 
   const showPreview = () => {
-    const target = upcoming[0]?.game || GAMES[0];
+    const target = upcoming[0]?.game || games[0];
     setPreviewGame(target);
     Animated.spring(slideAnim, { toValue: 10, useNativeDriver: true, friction: 8 }).start();
     clearTimeout(hideTimer.current);
