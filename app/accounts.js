@@ -1,13 +1,8 @@
 import { useState } from 'react';
-import { View, Text, Pressable, ActivityIndicator, ScrollView, StyleSheet } from 'react-native';
+import { View, Text, Pressable, ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { colors } from '../lib/theme';
-import { useGames } from '../lib/GamesContext';
-import { useWatchlist } from '../lib/WatchlistContext';
-
-const STEAM_MOCK_USER = 'DanPlaysGames';
-const XBOX_MOCK_GAMERTAG = 'DanPlaysGames';
 
 function AccountRow({ icon, iconBg, name, statusLabel, statusColor, desc, children }) {
   return (
@@ -29,48 +24,20 @@ function AccountRow({ icon, iconBg, name, statusLabel, statusColor, desc, childr
   );
 }
 
+function NotifyBtn({ active, onPress }) {
+  return (
+    <Pressable style={[styles.actionBtn, styles.actionBtnGhost]} onPress={onPress}>
+      <Text style={[styles.actionBtnText, styles.actionBtnTextGhost, active && { color: colors.orange }]}>
+        {active ? '✓ NOTIFIED' : 'NOTIFY ME'}
+      </Text>
+    </Pressable>
+  );
+}
+
 export default function AccountsScreen() {
   const router = useRouter();
-  const { games } = useGames();
-  const { saved, toggleWatchlist } = useWatchlist();
-
-  // Pick 4 real, currently-loaded PC titles to stand in for a "Steam wishlist" —
-  // real wishlist import needs the real Steam backend (see roadmap), this is
-  // still the UI mock, just no longer tied to titles that might not exist.
-  const steamWishlistImport = games.filter((g) => g.platforms.includes('pc')).slice(0, 4).map((g) => g.title);
-
-  const [steamConnected, setSteamConnected] = useState(false);
-  const [steamConnecting, setSteamConnecting] = useState(false);
-  const [xboxConnected, setXboxConnected] = useState(false);
-  const [xboxConnecting, setXboxConnecting] = useState(false);
-  const [notifyPs, setNotifyPs] = useState(false);
-  const [notifySwitch, setNotifySwitch] = useState(false);
-
-  const connectSteam = () => {
-    setSteamConnecting(true);
-    setTimeout(() => {
-      setSteamConnecting(false);
-      setSteamConnected(true);
-      steamWishlistImport.forEach((title) => {
-        if (!saved.has(title)) toggleWatchlist(title);
-      });
-    }, 1400);
-  };
-
-  const disconnectSteam = () => {
-    setSteamConnected(false);
-    steamWishlistImport.forEach((title) => {
-      if (saved.has(title)) toggleWatchlist(title);
-    });
-  };
-
-  const connectXbox = () => {
-    setXboxConnecting(true);
-    setTimeout(() => {
-      setXboxConnecting(false);
-      setXboxConnected(true);
-    }, 1400);
-  };
+  const [notifySteam, setNotifySteam] = useState(false);
+  const [notifyXbox, setNotifyXbox] = useState(false);
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -90,82 +57,22 @@ export default function AccountsScreen() {
           icon="🎮"
           iconBg="rgba(102,192,244,0.16)"
           name="Steam"
-          statusLabel={steamConnected ? 'CONNECTED' : 'AVAILABLE'}
-          statusColor="#A4D007"
-          desc={
-            steamConnected
-              ? `Connected as ${STEAM_MOCK_USER} · ${steamWishlistImport.length} games imported.`
-              : 'Sign in to auto-import your Steam wishlist.'
-          }
+          statusLabel="COMING SOON"
+          statusColor={colors.orange}
+          desc="Real sign-in and wishlist import are in progress — not ready yet, but on the way."
         >
-          {steamConnecting ? (
-            <ActivityIndicator color={colors.orange} />
-          ) : (
-            <Pressable
-              style={[styles.actionBtn, steamConnected && styles.actionBtnGhost]}
-              onPress={steamConnected ? disconnectSteam : connectSteam}
-            >
-              <Text style={[styles.actionBtnText, steamConnected && styles.actionBtnTextGhost]}>
-                {steamConnected ? 'DISCONNECT' : 'CONNECT'}
-              </Text>
-            </Pressable>
-          )}
+          <NotifyBtn active={notifySteam} onPress={() => setNotifySteam(!notifySteam)} />
         </AccountRow>
 
         <AccountRow
           icon="🟢"
           iconBg="rgba(61,163,93,0.16)"
           name="Xbox"
-          statusLabel="LIMITED"
-          statusColor="#D9B44A"
-          desc={
-            xboxConnected
-              ? `Signed in as ${XBOX_MOCK_GAMERTAG}. Wishlist sync isn't available yet — Microsoft doesn't expose it to third-party apps.`
-              : "You can sign in with your Microsoft account, but wishlist import isn't available yet."
-          }
+          statusLabel="COMING SOON"
+          statusColor={colors.orange}
+          desc="Sign-in is planned, though Microsoft doesn't expose wishlist data to third-party apps — that part may not be possible even once sign-in works."
         >
-          {xboxConnecting ? (
-            <ActivityIndicator color={colors.orange} />
-          ) : (
-            <Pressable
-              style={[styles.actionBtn, xboxConnected && styles.actionBtnGhost]}
-              onPress={xboxConnected ? () => setXboxConnected(false) : connectXbox}
-            >
-              <Text style={[styles.actionBtnText, xboxConnected && styles.actionBtnTextGhost]}>
-                {xboxConnected ? 'DISCONNECT' : 'CONNECT'}
-              </Text>
-            </Pressable>
-          )}
-        </AccountRow>
-
-        <AccountRow
-          icon="🔵"
-          iconBg="rgba(47,125,225,0.16)"
-          name="PlayStation"
-          statusLabel="UNAVAILABLE"
-          statusColor={colors.mutedDim}
-          desc="Sony doesn't offer a public sign-in or wishlist API for third-party apps — no shortcuts here."
-        >
-          <Pressable style={[styles.actionBtn, styles.actionBtnGhost]} onPress={() => setNotifyPs(!notifyPs)}>
-            <Text style={[styles.actionBtnText, styles.actionBtnTextGhost, notifyPs && { color: colors.orange }]}>
-              {notifyPs ? '✓ NOTIFIED' : 'NOTIFY ME'}
-            </Text>
-          </Pressable>
-        </AccountRow>
-
-        <AccountRow
-          icon="🔴"
-          iconBg="rgba(229,72,77,0.16)"
-          name="Nintendo Switch"
-          statusLabel="UNAVAILABLE"
-          statusColor={colors.mutedDim}
-          desc="Same story as PlayStation — Nintendo doesn't provide public account access for apps like this."
-        >
-          <Pressable style={[styles.actionBtn, styles.actionBtnGhost]} onPress={() => setNotifySwitch(!notifySwitch)}>
-            <Text style={[styles.actionBtnText, styles.actionBtnTextGhost, notifySwitch && { color: colors.orange }]}>
-              {notifySwitch ? '✓ NOTIFIED' : 'NOTIFY ME'}
-            </Text>
-          </Pressable>
+          <NotifyBtn active={notifyXbox} onPress={() => setNotifyXbox(!notifyXbox)} />
         </AccountRow>
       </ScrollView>
     </SafeAreaView>
