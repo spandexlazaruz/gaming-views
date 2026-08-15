@@ -3,16 +3,17 @@ import { View, Text, Pressable, Image, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { colors, PLATFORMS } from '../lib/theme';
+import { colors, PLATFORMS, GENRES } from '../lib/theme';
 import { useWatchlist } from '../lib/WatchlistContext';
 
-const STEPS = ['welcome', 'platforms', 'notifications', 'done'];
+const STEPS = ['welcome', 'platforms', 'genres', 'notifications', 'done'];
 
 export default function OnboardingScreen() {
   const router = useRouter();
-  const { setPreferredPlatform } = useWatchlist();
+  const { setPreferredPlatform, setPreferredGenre } = useWatchlist();
   const [step, setStep] = useState(0);
   const [selected, setSelected] = useState(new Set());
+  const [selectedGenres, setSelectedGenres] = useState(new Set());
 
   const togglePlatform = (key) => {
     setSelected((prev) => {
@@ -22,9 +23,20 @@ export default function OnboardingScreen() {
     });
   };
 
+  const toggleGenre = (key) => {
+    setSelectedGenres((prev) => {
+      const next = new Set(prev);
+      next.has(key) ? next.delete(key) : next.add(key);
+      return next;
+    });
+  };
+
   const finish = () => {
     if (selected.size === 1) {
       setPreferredPlatform([...selected][0]);
+    }
+    if (selectedGenres.size === 1) {
+      setPreferredGenre([...selectedGenres][0]);
     }
     // Fire-and-forget — never let a storage hiccup block navigation.
     AsyncStorage.setItem('hasOnboarded', 'true').catch(() => {});
@@ -40,6 +52,7 @@ export default function OnboardingScreen() {
   const nextLabel = {
     welcome: 'Get Started',
     platforms: 'Continue',
+    genres: 'Continue',
     notifications: 'Enable & Continue',
     done: 'Start Browsing',
   }[stepName];
@@ -91,6 +104,27 @@ export default function OnboardingScreen() {
           </>
         )}
 
+        {stepName === 'genres' && (
+          <>
+            <Text style={styles.title}>What do you like to play?</Text>
+            <Text style={styles.sub}>Optional — pick a genre to lead with, or skip and see everything.</Text>
+            <View style={styles.genreWrap}>
+              {GENRES.map((g) => {
+                const isSel = selectedGenres.has(g);
+                return (
+                  <Pressable
+                    key={g}
+                    style={[styles.genreChip, isSel && styles.genreChipActive]}
+                    onPress={() => toggleGenre(g)}
+                  >
+                    <Text style={[styles.genreChipText, isSel && styles.genreChipTextActive]}>{g}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </>
+        )}
+
         {stepName === 'notifications' && (
           <>
             <View style={styles.bell}>
@@ -110,9 +144,14 @@ export default function OnboardingScreen() {
             </View>
             <Text style={styles.title}>You're all set</Text>
             <Text style={styles.sub}>
-              {selected.size === 1
-                ? `Showing ${PLATFORMS[[...selected][0]].full} releases first. You can change this anytime.`
-                : "You're seeing releases across every platform. You can filter anytime."}
+              {(() => {
+                const platBit = selected.size === 1 ? PLATFORMS[[...selected][0]].full : null;
+                const genreBit = selectedGenres.size === 1 ? [...selectedGenres][0] : null;
+                if (platBit && genreBit) return `Showing ${genreBit} releases on ${platBit} first. You can change this anytime.`;
+                if (platBit) return `Showing ${platBit} releases first. You can change this anytime.`;
+                if (genreBit) return `Showing ${genreBit} releases first. You can change this anytime.`;
+                return "You're seeing every upcoming release. You can filter anytime.";
+              })()}
             </Text>
           </>
         )}
@@ -157,6 +196,14 @@ const styles = StyleSheet.create({
   platIcon: { width: 32, height: 32, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
   platIconText: { fontSize: 11, fontFamily: 'Inter_600SemiBold', color: '#0A0C10' },
   platName: { fontSize: 13.5, fontFamily: 'Inter_600SemiBold', color: colors.white },
+  genreWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 9, marginTop: 24, justifyContent: 'center' },
+  genreChip: {
+    paddingHorizontal: 15, paddingVertical: 10, borderRadius: 999,
+    backgroundColor: colors.bgCard, borderWidth: 1.5, borderColor: colors.line,
+  },
+  genreChipActive: { backgroundColor: colors.orangeDim, borderColor: colors.orange },
+  genreChipText: { fontSize: 13, fontFamily: 'Inter_600SemiBold', color: colors.muted },
+  genreChipTextActive: { color: colors.orange },
   footer: { padding: 24, paddingBottom: 30 },
   dots: { flexDirection: 'row', justifyContent: 'center', gap: 7, marginBottom: 18 },
   dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.line },
