@@ -8,6 +8,7 @@ import { LoadingState } from '../../lib/StateViews';
 import { daysUntil, formatDate, MONTH_NAMES } from '../../lib/dates';
 import { useWatchlist, LEAD_OPTIONS } from '../../lib/WatchlistContext';
 import GameCard from '../../components/GameCard';
+import QuickNavBar from '../../components/QuickNavBar';
 
 export default function GameDetailScreen() {
   const { title } = useLocalSearchParams();
@@ -17,18 +18,30 @@ export default function GameDetailScreen() {
 
   const game = games.find((g) => g.title === decodeURIComponent(title));
 
+  const FixedHeader = (
+    <View style={styles.headerBar}>
+      <Pressable style={styles.headerBtn} onPress={() => router.back()} hitSlop={8}>
+        <Text style={styles.headerBtnText}>←</Text>
+      </Pressable>
+    </View>
+  );
+
   if (loading) {
     return (
       <SafeAreaView style={styles.container} edges={['top']}>
+        {FixedHeader}
         <LoadingState label="Loading…" />
+        <QuickNavBar />
       </SafeAreaView>
     );
   }
 
   if (!game) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={styles.container} edges={['top']}>
+        {FixedHeader}
         <Text style={{ color: colors.white, padding: 20 }}>Game not found.</Text>
+        <QuickNavBar />
       </SafeAreaView>
     );
   }
@@ -46,11 +59,8 @@ export default function GameDetailScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <ScrollView showsVerticalScrollIndicator={false}>
-        <Pressable style={styles.backBtn} onPress={() => router.back()}>
-          <Text style={styles.backBtnText}>←</Text>
-        </Pressable>
-
+      {FixedHeader}
+      <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }}>
         {game.coverUrl ? (
           <View style={styles.heroPoster}>
             <Image source={{ uri: game.coverUrl }} style={StyleSheet.absoluteFill} resizeMode="cover" />
@@ -153,18 +163,28 @@ export default function GameDetailScreen() {
           )}
         </View>
       </ScrollView>
+      <QuickNavBar />
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bgPage },
-  backBtn: {
-    position: 'absolute', top: 14, left: 16, zIndex: 2,
-    width: 34, height: 34, borderRadius: 9, backgroundColor: 'rgba(10,12,16,0.6)',
+  headerBar: {
+    flexDirection: 'row', alignItems: 'center',
+    paddingHorizontal: 16, paddingVertical: 12,
+    backgroundColor: colors.bgNav, borderBottomWidth: 1, borderBottomColor: colors.line,
+  },
+  headerBtn: {
+    width: 34, height: 34, borderRadius: 9, backgroundColor: colors.bgCard,
+    borderWidth: 1, borderColor: colors.line,
     alignItems: 'center', justifyContent: 'center',
   },
-  backBtnText: { color: colors.white, fontSize: 18 },
+  headerBtnText: {
+    color: colors.white, fontSize: 18, lineHeight: 20,
+    textAlignVertical: 'center', includeFontPadding: false,
+    marginTop: -1,
+  },
   heroPoster: {
     width: '100%', aspectRatio: 4 / 3, justifyContent: 'flex-end', padding: 20,
     borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.08)',
@@ -179,7 +199,7 @@ const styles = StyleSheet.create({
     textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 5,
   },
   heroStamp: {
-    position: 'absolute', top: 60, right: 16, zIndex: 2,
+    position: 'absolute', top: 16, right: 16, zIndex: 2,
     backgroundColor: colors.orangeDim, borderRadius: 7, paddingHorizontal: 10, paddingVertical: 5,
   },
   heroStampText: { color: colors.orange, fontFamily: 'Inter_600SemiBold', fontSize: 11, textTransform: 'uppercase' },
