@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { View, Text, ScrollView, Pressable, StyleSheet } from 'react-native';
+import { View, Text, SectionList, ScrollView, Pressable, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { colors, PLATFORMS, GENRES } from '../../lib/theme';
 import { useGames } from '../../lib/GamesContext';
@@ -31,7 +31,9 @@ export default function CalendarScreen() {
     [games, activePlatform, activeGenre]
   );
 
-  const grouped = useMemo(() => {
+  // SectionList wants { title, data } per section instead of the { label, games }
+  // shape we used with plain arrays — same grouping logic, different output shape.
+  const sections = useMemo(() => {
     const byMonth = {};
     filtered.forEach((g) => {
       const key = `${g.date[0]}-${g.date[1]}`;
@@ -44,7 +46,7 @@ export default function CalendarScreen() {
       })
       .map(([key, gs]) => {
         const [y, m] = key.split('-').map(Number);
-        return { label: `${MONTH_NAMES[m]} ${y}`, games: gs.sort((a, b) => a.date[2] - b.date[2]) };
+        return { title: `${MONTH_NAMES[m]} ${y}`, data: gs.sort((a, b) => a.date[2] - b.date[2]) };
       });
   }, [filtered]);
 
@@ -67,79 +69,92 @@ export default function CalendarScreen() {
     );
   }
 
+  const ListHeader = (
+    <>
+      {hero && (
+        <View style={styles.hero}>
+          <Text style={styles.eyebrow}>NEXT UP</Text>
+          <Pressable onPress={() => router.push(`/game/${encodeURIComponent(hero.title)}`)}>
+            <Text style={styles.heroTitle}>{hero.title}</Text>
+          </Pressable>
+          <Text style={styles.heroSub}>
+            Releasing on {hero.platforms.map((p) => PLATFORMS[p].full).join(', ')}.
+          </Text>
+          <Text style={styles.heroMeta}>
+            {formatDate(hero.date)} · {heroDays <= 0 ? 'Out today' : heroDays === 1 ? '1 day left' : `${heroDays} days left`}
+          </Text>
+          <Pressable
+            style={[styles.heroBtn, heroSaved && styles.heroBtnSaved]}
+            onPress={() => toggleWatchlist(hero.title)}
+          >
+            <Text style={[styles.heroBtnText, heroSaved && { color: colors.orange }]}>
+              {heroSaved ? '❤️ ADDED TO WATCHLIST' : '🤍 ADD TO WATCHLIST'}
+            </Text>
+          </Pressable>
+        </View>
+      )}
+
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filters} contentContainerStyle={{ gap: 8, paddingHorizontal: 16 }}>
+        {platformChips.map((c) => (
+          <Pressable
+            key={c.key}
+            onPress={() => setActivePlatform(c.key)}
+            style={[styles.chip, activePlatform === c.key && styles.chipActive]}
+          >
+            <Text style={[styles.chipText, activePlatform === c.key && styles.chipTextActive]}>{c.label}</Text>
+          </Pressable>
+        ))}
+      </ScrollView>
+
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filtersSecondary} contentContainerStyle={{ gap: 8, paddingHorizontal: 16 }}>
+        {genreChips.map((c) => (
+          <Pressable
+            key={c.key}
+            onPress={() => setActiveGenre(c.key)}
+            style={[styles.genreChip, activeGenre === c.key && styles.genreChipActive]}
+          >
+            <Text style={[styles.genreChipText, activeGenre === c.key && styles.genreChipTextActive]}>{c.label}</Text>
+          </Pressable>
+        ))}
+      </ScrollView>
+
+      <View style={styles.sectionHead}>
+        <Text style={styles.sectionTitle}>UPCOMING RELEASES</Text>
+        <Text style={styles.sectionCount}>{filtered.length} TITLES</Text>
+      </View>
+    </>
+  );
+
   return (
     <View style={styles.container}>
-      <ScrollView showsVerticalScrollIndicator={false}>
-        {hero && (
-          <View style={styles.hero}>
-            <Text style={styles.eyebrow}>NEXT UP</Text>
-            <Pressable onPress={() => router.push(`/game/${encodeURIComponent(hero.title)}`)}>
-              <Text style={styles.heroTitle}>{hero.title}</Text>
-            </Pressable>
-            <Text style={styles.heroSub}>
-              Releasing on {hero.platforms.map((p) => PLATFORMS[p].full).join(', ')}.
-            </Text>
-            <Text style={styles.heroMeta}>
-              {formatDate(hero.date)} · {heroDays <= 0 ? 'Out today' : heroDays === 1 ? '1 day left' : `${heroDays} days left`}
-            </Text>
-            <Pressable
-              style={[styles.heroBtn, heroSaved && styles.heroBtnSaved]}
-              onPress={() => toggleWatchlist(hero.title)}
-            >
-              <Text style={[styles.heroBtnText, heroSaved && { color: colors.orange }]}>
-                {heroSaved ? '❤️ ADDED TO WATCHLIST' : '🤍 ADD TO WATCHLIST'}
-              </Text>
-            </Pressable>
+      <SectionList
+        sections={sections}
+        keyExtractor={(item) => item.title}
+        renderItem={({ item }) => (
+          <View style={styles.cardWrap}>
+            <GameCard
+              game={item}
+              highlightPlatform={activePlatform !== 'all' ? activePlatform : undefined}
+            />
           </View>
         )}
-
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filters} contentContainerStyle={{ gap: 8, paddingHorizontal: 16 }}>
-          {platformChips.map((c) => (
-            <Pressable
-              key={c.key}
-              onPress={() => setActivePlatform(c.key)}
-              style={[styles.chip, activePlatform === c.key && styles.chipActive]}
-            >
-              <Text style={[styles.chipText, activePlatform === c.key && styles.chipTextActive]}>{c.label}</Text>
-            </Pressable>
-          ))}
-        </ScrollView>
-
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filtersSecondary} contentContainerStyle={{ gap: 8, paddingHorizontal: 16 }}>
-          {genreChips.map((c) => (
-            <Pressable
-              key={c.key}
-              onPress={() => setActiveGenre(c.key)}
-              style={[styles.genreChip, activeGenre === c.key && styles.genreChipActive]}
-            >
-              <Text style={[styles.genreChipText, activeGenre === c.key && styles.genreChipTextActive]}>{c.label}</Text>
-            </Pressable>
-          ))}
-        </ScrollView>
-
-        <View style={styles.section}>
-          <View style={styles.sectionHead}>
-            <Text style={styles.sectionTitle}>UPCOMING RELEASES</Text>
-            <Text style={styles.sectionCount}>{filtered.length} TITLES</Text>
-          </View>
-          {filtered.length === 0 ? (
-            <Text style={styles.emptyText}>Nothing here for this combination yet — try a different platform or genre.</Text>
-          ) : (
-            grouped.map((group) => (
-              <View key={group.label}>
-                <Text style={styles.monthLabel}>{group.label}</Text>
-                {group.games.map((g) => (
-                  <GameCard
-                    key={g.title}
-                    game={g}
-                    highlightPlatform={activePlatform !== 'all' ? activePlatform : undefined}
-                  />
-                ))}
-              </View>
-            ))
-          )}
-        </View>
-      </ScrollView>
+        renderSectionHeader={({ section }) => (
+          <Text style={styles.monthLabel}>{section.title}</Text>
+        )}
+        ListHeaderComponent={ListHeader}
+        ListEmptyComponent={
+          <Text style={styles.emptyText}>Nothing here for this combination yet — try a different platform or genre.</Text>
+        }
+        contentContainerStyle={styles.listContent}
+        showsVerticalScrollIndicator={false}
+        stickySectionHeadersEnabled={false}
+        // Rendering tuning — keeps memory bounded even with hundreds of cards,
+        // this is the actual fix for the slowdown/crash risk with a big list.
+        initialNumToRender={8}
+        maxToRenderPerBatch={8}
+        windowSize={7}
+        removeClippedSubviews
+      />
     </View>
   );
 }
@@ -164,10 +179,11 @@ const styles = StyleSheet.create({
   genreChipActive: { backgroundColor: colors.orangeDim, borderColor: colors.orange },
   genreChipText: { fontFamily: 'Inter_500Medium', fontSize: 11.5, color: colors.mutedDim },
   genreChipTextActive: { color: colors.orange, fontFamily: 'Inter_600SemiBold' },
-  section: { padding: 16, paddingBottom: 100 },
-  sectionHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 12 },
+  listContent: { paddingBottom: 100 },
+  sectionHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 4, marginTop: 4, paddingHorizontal: 16, paddingTop: 16 },
   sectionTitle: { fontFamily: 'Poppins_800ExtraBold', fontSize: 15, letterSpacing: 0.5, color: colors.white },
   sectionCount: { fontSize: 11.5, color: colors.mutedDim, fontFamily: 'Inter_600SemiBold' },
-  monthLabel: { fontFamily: 'Inter_600SemiBold', fontSize: 11.5, color: colors.mutedDim, letterSpacing: 1, textTransform: 'uppercase', marginVertical: 12 },
+  cardWrap: { paddingHorizontal: 16 },
+  monthLabel: { fontFamily: 'Inter_600SemiBold', fontSize: 11.5, color: colors.mutedDim, letterSpacing: 1, textTransform: 'uppercase', marginVertical: 12, paddingHorizontal: 16 },
   emptyText: { color: colors.muted, fontSize: 13, textAlign: 'center', padding: 30 },
 });

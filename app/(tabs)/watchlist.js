@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { View, Text, ScrollView, Pressable, StyleSheet } from 'react-native';
+import { View, Text, FlatList, Pressable, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { colors } from '../../lib/theme';
 import { useGames } from '../../lib/GamesContext';
@@ -34,9 +34,17 @@ export default function WatchlistScreen() {
           </Pressable>
         </View>
       ) : (
-        <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
-          {items.map((g) => <GameCard key={g.title} game={g} />)}
-        </ScrollView>
+        <FlatList
+          data={items}
+          keyExtractor={(item) => item.title}
+          renderItem={({ item }) => <GameCard game={item} />}
+          contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
+          showsVerticalScrollIndicator={false}
+          initialNumToRender={8}
+          maxToRenderPerBatch={8}
+          windowSize={7}
+          removeClippedSubviews
+        />
       )}
     </View>
   );
