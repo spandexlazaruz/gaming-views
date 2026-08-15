@@ -7,9 +7,6 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
-    "splash": {
-      "backgroundColor": "#12161C"
-    },
     "assetBundlePatterns": [
       "**/*"
     ],
@@ -26,6 +23,14 @@
     },
     "plugins": [
       "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#12161C",
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 180
+        }
+      ],
       [
         "@sentry/react-native/expo",
         {
