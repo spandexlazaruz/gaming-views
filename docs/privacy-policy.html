@@ -33,6 +33,7 @@
   <p><strong>Your watchlist.</strong> The games you save stay on your own device only. They are not sent to, or stored on, any server we operate.</p>
   <p><strong>Game release data.</strong> The app fetches public game information (titles, release dates, platforms, cover art) from our own backend, which in turn sources it from IGDB (a third-party game database). This is a one-way, anonymous fetch — no personal information about you is sent as part of this request beyond what any web request includes automatically (see "Server logs" below).</p>
   <p><strong>Server logs.</strong> Like virtually all web services, our backend (hosted on Vercel) automatically logs basic technical information for standard operational and security purposes — such as IP address, timestamp, and which endpoint was called. This is not linked to any personal profile, since we don't have user accounts. These logs are used only for abuse prevention and debugging, and are retained only as long as our hosting provider's standard practice.</p>
+  <p><strong>Crash & diagnostic data.</strong> If the app crashes or encounters an error, technical diagnostic information — such as device model, operating system version, app version, and details about the error itself — is automatically sent to Sentry, our crash-reporting service, so we can identify and fix bugs. This data does not include your name, email, or any other personally identifying information, and is not linked to any user profile, since the app has none. Sentry retains this data for 30 days before it is automatically deleted.</p>
   <p><strong>Feedback emails.</strong> If you use the "Send Feedback" option in Settings, this opens your device's own email app with a message addressed to us. That email is sent directly from your device to our inbox via your own email provider — it does not pass through or get stored by the app or our servers.</p>
   <p><strong>Notifications (if enabled).</strong> Release-day reminders you set for watchlisted games are scheduled locally on your device. We do not receive any record of what reminders you've set.</p>
 
@@ -42,6 +43,7 @@
     <li><strong>Vercel</strong> — hosts our backend. Subject to standard server logging as described above.</li>
     <li><strong>(Future) Steam</strong> — if/when real Steam account linking becomes available, this policy will be updated before that feature goes live, and will clearly explain what additional data that involves.</li>
   </ul>
+    <li><strong>Sentry</strong> — used solely for crash and error diagnostics, as described above. Configured to exclude personal data and session replay recordings.</li>
 
   <h2>Children's privacy</h2>
   <p>Gaming Views is not directed at children under 13, and we do not knowingly collect personal information from children.</p>
