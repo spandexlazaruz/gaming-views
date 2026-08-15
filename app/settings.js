@@ -65,11 +65,11 @@ export default function SettingsScreen() {
           <Text style={styles.appVer}>v0.1 · SDK 54</Text>
         </View>
         <View style={styles.aboutLinks}>
-          <Pressable style={styles.aboutLink}>
+          <Pressable style={styles.aboutLink} onPress={() => Linking.openURL('https://spandexlazaruz.github.io/gaming-views/privacy-policy.html')}>
             <Text style={styles.aboutLinkText}>Privacy Policy</Text>
             <Text style={styles.chev}>›</Text>
           </Pressable>
-          <Pressable style={styles.aboutLink}>
+          <Pressable style={styles.aboutLink} onPress={() => Linking.openURL('https://spandexlazaruz.github.io/gaming-views/terms-of-service.html')}>
             <Text style={styles.aboutLinkText}>Terms of Service</Text>
             <Text style={styles.chev}>›</Text>
           </Pressable>
