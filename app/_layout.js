@@ -11,20 +11,12 @@ import * as Sentry from '@sentry/react-native';
 Sentry.init({
   dsn: 'https://9d423463abf5423c4015c039ac00dce8@o4511915073601536.ingest.de.sentry.io/4511915081990224',
 
-  // Adds more context data to events (IP address, cookies, user, etc.)
-  // For more information, visit: https://docs.sentry.io/platforms/react-native/data-management/data-collected/
-  sendDefaultPii: true,
-
-  // Enable Logs
-  enableLogs: true,
-
-  // Configure Session Replay
-  replaysSessionSampleRate: 0.1,
-  replaysOnErrorSampleRate: 1,
-  integrations: [Sentry.mobileReplayIntegration()],
-
-  // uncomment the line below to enable Spotlight (https://spotlightjs.com)
-  // spotlight: __DEV__,
+  // Deliberately lean: error monitoring only. Session Replay, default PII
+  // collection, and Logs are all wizard defaults we're turning off — they
+  // don't match what the published Privacy Policy actually promises
+  // ("no unnecessary tracking"), and they're scope this app doesn't need.
+  sendDefaultPii: false,
+  enableLogs: false,
 });
 
 export default Sentry.wrap(function RootLayout() {
