@@ -1,7 +1,8 @@
 import { useState, useMemo } from 'react';
-import { View, Text, SectionList, ScrollView, Pressable, StyleSheet } from 'react-native';
+import { View, Text, Image, SectionList, ScrollView, Pressable, StyleSheet } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import { colors, PLATFORMS, GENRES } from '../../lib/theme';
+import { colors, PLATFORMS, GENRES, posterThemes, hashStr } from '../../lib/theme';
 import { useGames } from '../../lib/GamesContext';
 import { LoadingState, ErrorState } from '../../lib/StateViews';
 import { daysUntil, formatDate, MONTH_NAMES } from '../../lib/dates';
@@ -22,6 +23,7 @@ export default function CalendarScreen() {
   const hero = useMemo(() => (games.length ? pickNextRelease(games) : null), [games]);
   const heroDays = hero ? daysUntil(hero.date) : 0;
   const heroSaved = hero ? saved.has(hero.title) : false;
+  const heroTheme = hero ? posterThemes[hashStr(hero.title) % posterThemes.length] : posterThemes[0];
 
   const filtered = useMemo(
     () => games.filter((g) =>
@@ -73,6 +75,16 @@ export default function CalendarScreen() {
     <>
       {hero && (
         <View style={styles.hero}>
+          {hero.coverUrl ? (
+            <Image source={{ uri: hero.coverUrl }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+          ) : (
+            <LinearGradient colors={heroTheme} start={{ x: 0.15, y: 0 }} end={{ x: 0.9, y: 1 }} style={StyleSheet.absoluteFill} />
+          )}
+          <LinearGradient
+            colors={['rgba(10,12,16,0.15)', 'rgba(10,12,16,0.65)', 'rgba(10,12,16,0.94)']}
+            start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }}
+            style={StyleSheet.absoluteFill}
+          />
           <Text style={styles.eyebrow}>NEXT UP</Text>
           <Pressable onPress={() => router.push(`/game/${encodeURIComponent(hero.title)}`)}>
             <Text style={styles.heroTitle}>{hero.title}</Text>
@@ -161,11 +173,28 @@ export default function CalendarScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bgPage },
-  hero: { padding: 20, borderBottomWidth: 1, borderBottomColor: colors.line },
-  eyebrow: { color: colors.orange, fontFamily: 'Inter_600SemiBold', fontSize: 12, letterSpacing: 1, marginBottom: 8 },
-  heroTitle: { fontFamily: 'Poppins_800ExtraBold', fontSize: 26, color: colors.white, marginBottom: 8, maxWidth: 320 },
-  heroSub: { color: colors.muted, fontSize: 14, marginBottom: 4, maxWidth: 320, lineHeight: 20 },
-  heroMeta: { color: colors.muted, fontSize: 12.5, marginBottom: 16 },
+  hero: {
+    padding: 20, paddingTop: 24,
+    borderBottomWidth: 1, borderBottomColor: colors.line,
+    position: 'relative', overflow: 'hidden',
+    minHeight: 260, justifyContent: 'flex-end',
+  },
+  eyebrow: {
+    color: colors.orange, fontFamily: 'Inter_600SemiBold', fontSize: 12, letterSpacing: 1, marginBottom: 8,
+    textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4,
+  },
+  heroTitle: {
+    fontFamily: 'Poppins_800ExtraBold', fontSize: 26, color: colors.white, marginBottom: 8, maxWidth: 320,
+    textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 6,
+  },
+  heroSub: {
+    color: '#D5D9DE', fontSize: 14, marginBottom: 4, maxWidth: 320, lineHeight: 20,
+    textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4,
+  },
+  heroMeta: {
+    color: '#D5D9DE', fontSize: 12.5, marginBottom: 16,
+    textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4,
+  },
   heroBtn: { backgroundColor: colors.orange, borderRadius: 9, paddingVertical: 13, alignItems: 'center' },
   heroBtnSaved: { backgroundColor: 'transparent', borderWidth: 1.5, borderColor: colors.orange },
   heroBtnText: { fontFamily: 'Poppins_700Bold', fontSize: 13.5, color: '#1A0F00' },
