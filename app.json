@@ -12,7 +12,10 @@
     ],
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.gamingviews.app"
+      "bundleIdentifier": "com.gamingviews.app",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "package": "com.gamingviews.app",
