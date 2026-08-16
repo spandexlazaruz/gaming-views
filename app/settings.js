@@ -1,12 +1,13 @@
-import { useState } from 'react';
 import { View, Text, Pressable, Switch, ScrollView, Linking, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { colors } from '../lib/theme';
+import { useWatchlist } from '../lib/WatchlistContext';
+import { ensureNotificationPermission } from '../lib/notifications';
 
-function SwitchRow({ title, desc, value, onValueChange }) {
+function SwitchRow({ title, desc, value, onValueChange, disabled }) {
   return (
-    <View style={styles.switchRow}>
+    <View style={[styles.switchRow, disabled && styles.switchRowDisabled]}>
       <View style={{ flex: 1 }}>
         <Text style={styles.switchTitle}>{title}</Text>
         <Text style={styles.switchDesc}>{desc}</Text>
@@ -14,6 +15,7 @@ function SwitchRow({ title, desc, value, onValueChange }) {
       <Switch
         value={value}
         onValueChange={onValueChange}
+        disabled={disabled}
         trackColor={{ false: 'rgba(255,255,255,0.14)', true: colors.orange }}
         thumbColor={colors.white}
       />
@@ -23,8 +25,17 @@ function SwitchRow({ title, desc, value, onValueChange }) {
 
 export default function SettingsScreen() {
   const router = useRouter();
-  const [weeklyDigest, setWeeklyDigest] = useState(false);
-  const [priceDrops, setPriceDrops] = useState(true);
+  const { weeklyDigestEnabled, setWeeklyDigestEnabled } = useWatchlist();
+
+  const toggleWeeklyDigest = async (next) => {
+    if (next) {
+      // Ask for permission right when the user opts in, same as the
+      // per-game reminders — if they say no, the toggle just won't fire
+      // anything (matches what actually happens, no fake "on" state).
+      await ensureNotificationPermission().catch(() => {});
+    }
+    setWeeklyDigestEnabled(next);
+  };
 
   const sendFeedback = () => {
     const subject = encodeURIComponent('Gaming Views Feedback');
@@ -49,14 +60,15 @@ export default function SettingsScreen() {
         <SwitchRow
           title="Weekly Digest"
           desc="A Monday summary of what's releasing this week."
-          value={weeklyDigest}
-          onValueChange={setWeeklyDigest}
+          value={weeklyDigestEnabled}
+          onValueChange={toggleWeeklyDigest}
         />
         <SwitchRow
-          title="Steam Price Drops"
-          desc="Alerts when a watchlisted game goes on sale."
-          value={priceDrops}
-          onValueChange={setPriceDrops}
+          title="Steam Price Drops (Coming Soon)"
+          desc="Needs real Steam pricing data, which isn't wired up yet — see Accounts. Off until that's real."
+          value={false}
+          onValueChange={() => {}}
+          disabled
         />
 
         <Text style={[styles.sectionHead, { marginTop: 26 }]}>ABOUT</Text>
@@ -108,6 +120,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.bgCard, borderWidth: 1, borderColor: colors.line,
     borderRadius: 12, padding: 14, marginBottom: 8,
   },
+  switchRowDisabled: { opacity: 0.55 },
   switchTitle: { fontFamily: 'Inter_600SemiBold', fontSize: 13.5, color: colors.white },
   switchDesc: { fontSize: 11.5, color: colors.muted, marginTop: 2, lineHeight: 16 },
   aboutBlock: {

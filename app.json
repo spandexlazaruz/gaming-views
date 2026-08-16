@@ -38,7 +38,8 @@
           "project": "react-native",
           "organization": "gaming-views"
         }
-      ]
+      ],
+      "expo-notifications"
     ],
     "extra": {
       "router": {},

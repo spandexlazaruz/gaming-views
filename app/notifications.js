@@ -1,19 +1,22 @@
-import { useMemo, useRef, useState } from 'react';
-import { View, Text, ScrollView, Pressable, Animated, StyleSheet } from 'react-native';
+import { useMemo, useState, useEffect } from 'react';
+import { View, Text, ScrollView, Pressable, StyleSheet, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { colors } from '../lib/theme';
 import { useGames } from '../lib/GamesContext';
-import { daysUntil } from '../lib/dates';
 import { useWatchlist, LEAD_OPTIONS } from '../lib/WatchlistContext';
+import { getNotificationPermissionStatus, ensureNotificationPermission, sendTestNotification } from '../lib/notifications';
 
 export default function NotificationsScreen() {
   const router = useRouter();
   const { saved, reminders } = useWatchlist();
   const { games } = useGames();
-  const slideAnim = useRef(new Animated.Value(-140)).current;
-  const [previewGame, setPreviewGame] = useState(null);
-  const hideTimer = useRef(null);
+  const [permissionGranted, setPermissionGranted] = useState(null); // null = still checking
+  const [testState, setTestState] = useState('idle'); // idle | sending | sent | denied
+
+  useEffect(() => {
+    getNotificationPermissionStatus().then(setPermissionGranted).catch(() => setPermissionGranted(false));
+  }, []);
 
   const upcoming = useMemo(() => {
     return [...saved]
@@ -29,15 +32,27 @@ export default function NotificationsScreen() {
       .sort((a, b) => a.scheduled - b.scheduled);
   }, [saved, reminders, games]);
 
-  const showPreview = () => {
+  const handlePreview = async () => {
     const target = upcoming[0]?.game || games[0];
-    setPreviewGame(target);
-    Animated.spring(slideAnim, { toValue: 10, useNativeDriver: true, friction: 8 }).start();
-    clearTimeout(hideTimer.current);
-    hideTimer.current = setTimeout(() => {
-      Animated.timing(slideAnim, { toValue: -140, duration: 250, useNativeDriver: true }).start();
-    }, 3500);
+    if (!target) return;
+    setTestState('sending');
+    const granted = await ensureNotificationPermission();
+    setPermissionGranted(granted);
+    if (!granted) {
+      setTestState('denied');
+      return;
+    }
+    const sent = await sendTestNotification(target);
+    setTestState(sent ? 'sent' : 'denied');
+    setTimeout(() => setTestState('idle'), 4000);
   };
+
+  const previewLabel = {
+    idle: 'SEND A TEST NOTIFICATION',
+    sending: 'SENDING…',
+    sent: 'SENT — CHECK YOUR NOTIFICATIONS',
+    denied: 'NOTIFICATIONS ARE OFF — TAP TO ENABLE',
+  }[testState];
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -49,9 +64,17 @@ export default function NotificationsScreen() {
       </View>
 
       <ScrollView contentContainerStyle={styles.body}>
-        <Pressable style={styles.previewBtn} onPress={showPreview}>
+        {permissionGranted === false && (
+          <Pressable style={styles.permissionBanner} onPress={() => Linking.openSettings()}>
+            <Text style={styles.permissionBannerText}>
+              Notifications are turned off for Gaming Views. Reminders below won't actually fire until you enable them in your device Settings.
+            </Text>
+          </Pressable>
+        )}
+
+        <Pressable style={styles.previewBtn} onPress={handlePreview} disabled={testState === 'sending'}>
           <Text style={{ fontSize: 14 }}>🔔</Text>
-          <Text style={styles.previewBtnText}>PREVIEW A PUSH NOTIFICATION</Text>
+          <Text style={styles.previewBtnText}>{previewLabel}</Text>
         </Pressable>
 
         {upcoming.length === 0 ? (
@@ -81,24 +104,6 @@ export default function NotificationsScreen() {
           </>
         )}
       </ScrollView>
-
-      <Animated.View style={[styles.pushPreview, { transform: [{ translateY: slideAnim }] }]} pointerEvents="none">
-        {previewGame && (
-          <View style={styles.pushCard}>
-            <View style={styles.pushIcon} />
-            <View style={{ flex: 1 }}>
-              <View style={styles.pushAppRow}>
-                <Text style={styles.pushApp}>GAMING VIEWS</Text>
-                <Text style={styles.pushNow}>now</Text>
-              </View>
-              <Text style={styles.pushTitle}>🎮 {previewGame.title}</Text>
-              <Text style={styles.pushBody}>
-                {previewGame.title} {daysUntil(previewGame.date) <= 0 ? 'is out now' : daysUntil(previewGame.date) === 1 ? 'releases tomorrow' : `releases in ${daysUntil(previewGame.date)} days`}. Tap to view details.
-              </Text>
-            </View>
-          </View>
-        )}
-      </Animated.View>
     </SafeAreaView>
   );
 }
@@ -117,6 +122,11 @@ const styles = StyleSheet.create({
   backBtnText: { color: colors.white, fontSize: 18 },
   title: { fontFamily: 'Poppins_700Bold', fontSize: 15, color: colors.white },
   body: { padding: 16, paddingBottom: 60 },
+  permissionBanner: {
+    backgroundColor: colors.orangeDim, borderWidth: 1, borderColor: colors.orange,
+    borderRadius: 11, padding: 13, marginBottom: 14,
+  },
+  permissionBannerText: { fontSize: 12, color: colors.white, lineHeight: 17 },
   previewBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
     backgroundColor: colors.bgCard, borderWidth: 1, borderColor: colors.line,
@@ -139,17 +149,4 @@ const styles = StyleSheet.create({
   emptyIcon: { fontSize: 30, marginBottom: 12 },
   emptyTitle: { fontFamily: 'Inter_600SemiBold', fontSize: 14, color: colors.white, marginBottom: 6 },
   emptyDesc: { fontSize: 12.5, color: colors.muted, textAlign: 'center', lineHeight: 18 },
-  pushPreview: { position: 'absolute', top: 0, left: 16, right: 16 },
-  pushCard: {
-    flexDirection: 'row', gap: 11,
-    backgroundColor: 'rgba(28,33,41,0.96)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
-    borderRadius: 16, padding: 13,
-    shadowColor: '#000', shadowOpacity: 0.4, shadowRadius: 14, shadowOffset: { width: 0, height: 8 }, elevation: 10,
-  },
-  pushIcon: { width: 30, height: 30, borderRadius: 8, backgroundColor: colors.orange, flexShrink: 0 },
-  pushAppRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 2 },
-  pushApp: { fontSize: 10, fontFamily: 'Inter_600SemiBold', color: colors.muted, letterSpacing: 0.5 },
-  pushNow: { fontSize: 10, color: colors.mutedDim },
-  pushTitle: { fontFamily: 'Inter_600SemiBold', fontSize: 13, color: colors.white, marginBottom: 2 },
-  pushBody: { fontSize: 11.5, color: colors.muted, lineHeight: 16 },
 });

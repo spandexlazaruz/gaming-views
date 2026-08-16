@@ -5,6 +5,7 @@ import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { colors, PLATFORMS, GENRES } from '../lib/theme';
 import { useWatchlist } from '../lib/WatchlistContext';
+import { ensureNotificationPermission } from '../lib/notifications';
 
 const STEPS = ['welcome', 'platforms', 'genres', 'notifications', 'done'];
 
@@ -43,7 +44,13 @@ export default function OnboardingScreen() {
     router.replace('/(tabs)');
   };
 
-  const next = () => {
+  const next = async () => {
+    // This is the real permission prompt, triggered right after the
+    // explanation screen — not a mockup. Whether the user grants or denies,
+    // we still move on; nothing here should block onboarding.
+    if (stepName === 'notifications') {
+      await ensureNotificationPermission().catch(() => {});
+    }
     if (step < STEPS.length - 1) setStep(step + 1);
     else finish();
   };
