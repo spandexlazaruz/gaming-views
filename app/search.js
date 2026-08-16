@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
-import { View, Text, TextInput, ScrollView, Pressable, StyleSheet } from 'react-native';
+import { View, Text, TextInput, FlatList, Pressable, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { colors } from '../lib/theme';
@@ -46,15 +46,28 @@ export default function SearchScreen() {
         </Pressable>
       </View>
 
-      <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
-        {results === null && (
-          <Text style={styles.hint}>Search across all {games.length} upcoming releases by title or genre.</Text>
-        )}
-        {results !== null && results.length === 0 && (
-          <Text style={styles.hint}>No matches for "{query}".</Text>
-        )}
-        {results !== null && results.map((g) => <GameCard key={g.title} game={g} />)}
-      </ScrollView>
+      {results === null || results.length === 0 ? (
+        <View style={styles.body}>
+          <Text style={styles.hint}>
+            {results === null
+              ? `Search across all ${games.length} upcoming releases by title or genre.`
+              : `No matches for "${query}".`}
+          </Text>
+        </View>
+      ) : (
+        <FlatList
+          data={results}
+          keyExtractor={(item) => item.title}
+          renderItem={({ item }) => <GameCard game={item} />}
+          contentContainerStyle={styles.body}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+          initialNumToRender={8}
+          maxToRenderPerBatch={8}
+          windowSize={7}
+          removeClippedSubviews
+        />
+      )}
     </SafeAreaView>
   );
 }
