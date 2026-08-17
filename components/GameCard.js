@@ -59,7 +59,7 @@ export default function GameCard({ game, highlightPlatform, showReminder }) {
           <Pressable
             style={styles.saveMini}
             hitSlop={8}
-            onPress={(e) => { e.stopPropagation(); toggleWatchlist(game.title); }}
+            onPress={(e) => { e.stopPropagation(); toggleWatchlist(game.title, highlightPlatform); }}
           >
             <Text style={{ fontSize: 12, color: isSaved ? colors.orange : colors.white }}>{isSaved ? '❤️' : '🤍'}</Text>
           </Pressable>
@@ -78,7 +78,7 @@ export default function GameCard({ game, highlightPlatform, showReminder }) {
           <Pressable
             style={styles.saveMini}
             hitSlop={8}
-            onPress={(e) => { e.stopPropagation(); toggleWatchlist(game.title); }}
+            onPress={(e) => { e.stopPropagation(); toggleWatchlist(game.title, highlightPlatform); }}
           >
             <Text style={{ fontSize: 12, color: isSaved ? colors.orange : colors.white }}>{isSaved ? '❤️' : '🤍'}</Text>
           </Pressable>

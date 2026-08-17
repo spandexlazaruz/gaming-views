@@ -1,8 +1,10 @@
-import { Stack } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useFonts, Poppins_600SemiBold, Poppins_700Bold, Poppins_800ExtraBold } from '@expo-google-fonts/poppins';
 import { Inter_400Regular, Inter_500Medium, Inter_600SemiBold } from '@expo-google-fonts/inter';
 import { View, ActivityIndicator } from 'react-native';
+import { useEffect } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { WatchlistProvider } from '../lib/WatchlistContext';
 import { GamesProvider } from '../lib/GamesContext';
 import { colors } from '../lib/theme';
@@ -20,6 +22,7 @@ Sentry.init({
 });
 
 export default Sentry.wrap(function RootLayout() {
+  const router = useRouter();
   const [fontsLoaded] = useFonts({
     Poppins_600SemiBold,
     Poppins_700Bold,
@@ -28,6 +31,32 @@ export default Sentry.wrap(function RootLayout() {
     Inter_500Medium,
     Inter_600SemiBold,
   });
+
+  // `app/onboarding.js` has always written a `hasOnboarded` flag when someone
+  // finishes the flow, but nothing ever read it or redirected a first-time
+  // user into onboarding in the first place — so it structurally never ran
+  // for anyone, real first-time install or existing tester alike (fix log
+  // item 6). This is the missing other half: check the flag once fonts are
+  // ready (so navigation is actually possible) and redirect if it's unset.
+  // Deliberately simple, no migration — every device without the flag set,
+  // including every existing tester's, will see onboarding once on its next
+  // launch. That's an intentional choice, not an oversight: it also
+  // surfaces real onboarding UX feedback from active testers before public
+  // launch, not just genuinely new installs.
+  useEffect(() => {
+    if (!fontsLoaded) return;
+    (async () => {
+      try {
+        const hasOnboarded = await AsyncStorage.getItem('hasOnboarded');
+        if (!hasOnboarded) {
+          router.replace('/onboarding');
+        }
+      } catch {
+        // Unreadable storage shouldn't block launch — fail open and just
+        // skip the redirect rather than crash or hang here.
+      }
+    })();
+  }, [fontsLoaded]);
 
   if (!fontsLoaded) {
     return (

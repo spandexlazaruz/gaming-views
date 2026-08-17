@@ -10,7 +10,7 @@ import GameCard from '../../components/GameCard';
 export default function WatchlistScreen() {
   const router = useRouter();
   const { games } = useGames();
-  const { saved } = useWatchlist();
+  const { saved, platformContext } = useWatchlist();
 
   const items = useMemo(
     () => [...saved].map((t) => games.find((g) => g.title === t)).filter(Boolean).sort((a, b) => toDate(a.date) - toDate(b.date)),
@@ -41,7 +41,9 @@ export default function WatchlistScreen() {
         <FlatList
           data={items}
           keyExtractor={(item) => item.title}
-          renderItem={({ item }) => <GameCard game={item} showReminder />}
+          renderItem={({ item }) => (
+            <GameCard game={item} showReminder highlightPlatform={platformContext[item.title]} />
+          )}
           contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
           showsVerticalScrollIndicator={false}
           initialNumToRender={8}
