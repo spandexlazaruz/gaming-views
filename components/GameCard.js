@@ -1,4 +1,5 @@
-import { View, Text, Pressable, Image, StyleSheet } from 'react-native';
+import { View, Text, Pressable, StyleSheet } from 'react-native';
+import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { colors, PLATFORMS, posterThemes, hashStr } from '../lib/theme';
@@ -27,7 +28,20 @@ export default function GameCard({ game, highlightPlatform }) {
     >
       {game.coverUrl ? (
         <View style={styles.thumb}>
-          <Image source={{ uri: game.coverUrl }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+          <Image
+            source={{ uri: game.coverUrl }}
+            style={StyleSheet.absoluteFill}
+            contentFit="cover"
+            // expo-image (unlike core RN Image) cancels and safely tears down
+            // an in-flight load when its view unmounts, instead of firing the
+            // load callback against an already-deallocated native view. That
+            // was the root cause of a real production crash
+            // (EXC_BAD_ACCESS in nativeImageResponseProgress) when a FlatList
+            // recycled an offscreen GameCard mid-image-load — see fix log
+            // item 8. This swap is what makes it safe to use
+            // removeClippedSubviews on the lists that render this card again.
+            recyclingKey={game.title}
+          />
           <LinearGradient
             colors={['transparent', 'rgba(0,0,0,0.7)']}
             start={{ x: 0, y: 0.35 }} end={{ x: 0, y: 1 }}

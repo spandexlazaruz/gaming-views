@@ -65,6 +65,15 @@ export default function SearchScreen() {
           initialNumToRender={8}
           maxToRenderPerBatch={8}
           windowSize={7}
+          // removeClippedSubviews re-enabled 2026-08-17 now that GameCard
+          // uses expo-image instead of core RN Image (see GameCard.js) —
+          // expo-image safely cancels in-flight loads on unmount instead of
+          // firing a callback against a deallocated view, which is what
+          // caused a real production crash here (fix log item 8). This list
+          // swaps its full contents on every keystroke, so it's the highest
+          // scroll/recycle churn in the app and was the first place that
+          // crash surfaced — worth extra scrutiny here specifically if
+          // anything crash-shaped turns up again.
           removeClippedSubviews
         />
       )}

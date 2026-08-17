@@ -43,6 +43,8 @@ export default function WatchlistScreen() {
           initialNumToRender={8}
           maxToRenderPerBatch={8}
           windowSize={7}
+          // removeClippedSubviews re-enabled 2026-08-17 now that GameCard
+          // uses expo-image — see the note in app/search.js (fix log item 8).
           removeClippedSubviews
         />
       )}

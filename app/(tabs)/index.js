@@ -160,11 +160,13 @@ export default function CalendarScreen() {
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
         stickySectionHeadersEnabled={false}
-        // Rendering tuning — keeps memory bounded even with hundreds of cards,
-        // this is the actual fix for the slowdown/crash risk with a big list.
+        // Rendering tuning — keeps memory bounded even with hundreds of cards.
         initialNumToRender={8}
         maxToRenderPerBatch={8}
         windowSize={7}
+        // removeClippedSubviews re-enabled 2026-08-17 now that GameCard uses
+        // expo-image — see the note in app/search.js for the full story on
+        // the crash this previously caused (fix log item 8).
         removeClippedSubviews
       />
     </View>
