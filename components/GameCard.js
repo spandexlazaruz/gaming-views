@@ -4,12 +4,18 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { colors, PLATFORMS, posterThemes, hashStr } from '../lib/theme';
 import { daysUntil, formatDateShort } from '../lib/dates';
-import { useWatchlist } from '../lib/WatchlistContext';
+import { useWatchlist, LEAD_OPTIONS } from '../lib/WatchlistContext';
 
-export default function GameCard({ game, highlightPlatform }) {
+export default function GameCard({ game, highlightPlatform, showReminder }) {
   const router = useRouter();
-  const { saved, toggleWatchlist } = useWatchlist();
+  const { saved, toggleWatchlist, reminders } = useWatchlist();
   const isSaved = saved.has(game.title);
+  // Only meaningful for saved games — showReminder is currently only passed
+  // from the Watchlist screen, where every card is saved by definition, but
+  // guarding on isSaved keeps this safe if it's ever reused elsewhere.
+  const reminderLabel = showReminder && isSaved
+    ? (LEAD_OPTIONS.find((o) => o.key === (reminders[game.title] || 'release_day')) || LEAD_OPTIONS[0]).label
+    : null;
   const theme = posterThemes[hashStr(game.title) % posterThemes.length];
   const days = daysUntil(game.date);
   const primaryPlat = (highlightPlatform && game.platforms.includes(highlightPlatform))
@@ -96,6 +102,12 @@ export default function GameCard({ game, highlightPlatform }) {
             </View>
           )}
         </View>
+        {reminderLabel && (
+          <View style={styles.reminderRow}>
+            <Text style={{ fontSize: 10.5 }}>🔔</Text>
+            <Text style={styles.reminderText}>Reminder: {reminderLabel}</Text>
+          </View>
+        )}
         {game.steam && (
           <View style={styles.steamRow}>
             <Text style={styles.steamPrice}>
@@ -156,6 +168,8 @@ const styles = StyleSheet.create({
   dot: { width: 8, height: 8, borderRadius: 4 },
   badgeSoon: { backgroundColor: colors.orangeDim, borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2.5 },
   badgeSoonText: { fontSize: 11, fontFamily: 'Inter_600SemiBold', color: colors.orange },
+  reminderRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 2 },
+  reminderText: { fontSize: 11, fontFamily: 'Inter_500Medium', color: colors.orange },
   steamRow: { flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: 2, flexWrap: 'wrap' },
   steamPrice: { fontSize: 12, fontFamily: 'Inter_600SemiBold', color: '#66C0F4' },
   deckBadge: { borderRadius: 5, paddingHorizontal: 6, paddingVertical: 2 },

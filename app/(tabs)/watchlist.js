@@ -41,7 +41,7 @@ export default function WatchlistScreen() {
         <FlatList
           data={items}
           keyExtractor={(item) => item.title}
-          renderItem={({ item }) => <GameCard game={item} />}
+          renderItem={({ item }) => <GameCard game={item} showReminder />}
           contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
           showsVerticalScrollIndicator={false}
           initialNumToRender={8}

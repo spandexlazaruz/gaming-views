@@ -7,6 +7,7 @@ import { useGames } from '../../lib/GamesContext';
 import { LoadingState } from '../../lib/StateViews';
 import { daysUntil, formatDate, MONTH_NAMES } from '../../lib/dates';
 import { useWatchlist, LEAD_OPTIONS } from '../../lib/WatchlistContext';
+import { ensureNotificationPermission } from '../../lib/notifications';
 import GameCard from '../../components/GameCard';
 import QuickNavBar from '../../components/QuickNavBar';
 
@@ -103,7 +104,22 @@ export default function GameDetailScreen() {
 
           <Pressable
             style={[styles.cta, isSaved && styles.ctaSaved]}
-            onPress={() => toggleWatchlist(game.title)}
+            onPress={() => {
+              // Adding a game sets a default "Release Day" reminder immediately
+              // (see WatchlistContext.toggleWatchlist) — so this is the real
+              // first moment a notification actually gets turned on for most
+              // people, not just the REMIND ME chips below. Request the OS
+              // permission prompt right here so it has a chance to actually
+              // fire. ensureNotificationPermission() only shows the real
+              // system dialog once ever (iOS/Android both no-op silently on
+              // repeat calls after the first grant/deny), so this is safe to
+              // call on every add, not just a tracked "first time".
+              const wasSaved = isSaved;
+              toggleWatchlist(game.title);
+              if (!wasSaved) {
+                ensureNotificationPermission().catch(() => {});
+              }
+            }}
           >
             <Text style={[styles.ctaText, isSaved && { color: colors.orange }]}>
               {isSaved ? '❤️ IN YOUR WATCHLIST' : '🤍 ADD TO WATCHLIST'}
@@ -120,7 +136,16 @@ export default function GameDetailScreen() {
                     <Pressable
                       key={o.key}
                       style={[styles.leadChip, active && styles.leadChipActive]}
-                      onPress={() => setReminderLead(game.title, o.key)}
+                      onPress={() => {
+                        // Same permission request as the watchlist CTA above —
+                        // explicitly changing the lead time is the other real
+                        // "selecting a notification option" moment worth
+                        // covering, in case someone already granted/denied
+                        // before ever adding a game (e.g. from the
+                        // Notifications tab's test button).
+                        ensureNotificationPermission().catch(() => {});
+                        setReminderLead(game.title, o.key);
+                      }}
                     >
                       <Text style={[styles.leadChipText, active && styles.leadChipTextActive]}>{o.label}</Text>
                     </Pressable>
@@ -152,7 +177,10 @@ export default function GameDetailScreen() {
 
           <View style={styles.section}>
             <Text style={styles.sectionHead}>ABOUT THIS RELEASE</Text>
-            <Text style={styles.blurb}>{blurb} Add it to your watchlist and we'll keep it front and center as the date gets closer.</Text>
+            <Text style={styles.blurb}>{blurb}</Text>
+            {!isSaved && (
+              <Text style={styles.blurbCta}>Add it to your watchlist and we'll keep it front and center as the date gets closer.</Text>
+            )}
           </View>
 
           {others.length > 0 && (
@@ -230,6 +258,7 @@ const styles = StyleSheet.create({
   section: { marginBottom: 22 },
   sectionHead: { fontSize: 11.5, fontFamily: 'Inter_600SemiBold', color: colors.mutedDim, letterSpacing: 1, marginBottom: 10 },
   blurb: { fontSize: 13.5, color: colors.muted, lineHeight: 21, fontFamily: 'Inter_400Regular' },
+  blurbCta: { fontSize: 12, color: colors.mutedDim, lineHeight: 18, fontFamily: 'Inter_500Medium', fontStyle: 'italic', marginTop: 8 },
   steamCard: {
     backgroundColor: colors.bgCard, borderWidth: 1, borderColor: colors.line,
     borderRadius: 12, padding: 14, flexDirection: 'row', alignItems: 'center',
