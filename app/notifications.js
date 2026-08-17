@@ -65,7 +65,7 @@ export default function NotificationsScreen() {
 
       <ScrollView contentContainerStyle={styles.body}>
         {permissionGranted === false && (
-          <Pressable style={styles.permissionBanner} onPress={() => Linking.openSettings()}>
+          <Pressable style={styles.permissionBanner} onPress={() => Linking.openSettings().catch(() => {})}>
             <Text style={styles.permissionBannerText}>
               Notifications are turned off for Gaming Views. Reminders below won't actually fire until you enable them in your device Settings.
             </Text>
