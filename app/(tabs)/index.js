@@ -19,6 +19,10 @@ export default function CalendarScreen() {
   const { saved, toggleWatchlist, preferredPlatform, preferredGenre } = useWatchlist();
   const [activePlatform, setActivePlatform] = useState(preferredPlatform);
   const [activeGenre, setActiveGenre] = useState(preferredGenre);
+  // No "preferred month" concept, unlike platform/genre — the whole point of
+  // this filter is a rolling window that shifts day to day, so there's
+  // nothing sensible to persist as a default. Always starts on "All Months".
+  const [activeMonth, setActiveMonth] = useState('all');
 
   const hero = useMemo(() => (games.length ? pickNextRelease(games) : null), [games]);
   const heroDays = hero ? daysUntil(hero.date) : 0;
@@ -28,9 +32,10 @@ export default function CalendarScreen() {
   const filtered = useMemo(
     () => games.filter((g) =>
       (activePlatform === 'all' || g.platforms.includes(activePlatform)) &&
-      (activeGenre === 'all' || g.genreCategory === activeGenre)
+      (activeGenre === 'all' || g.genreCategory === activeGenre) &&
+      (activeMonth === 'all' || `${g.date[0]}-${g.date[1]}` === activeMonth)
     ),
-    [games, activePlatform, activeGenre]
+    [games, activePlatform, activeGenre, activeMonth]
   );
 
   // SectionList wants { title, data } per section instead of the { label, games }
@@ -54,6 +59,22 @@ export default function CalendarScreen() {
 
   const platformChips = [{ key: 'all', label: 'All' }, ...Object.entries(PLATFORMS).map(([k, v]) => ({ key: k, label: v.label }))];
   const genreChips = [{ key: 'all', label: 'All Genres' }, ...GENRES.map((g) => ({ key: g, label: g }))];
+  // Built from the live dataset, not a fixed 12-month list — the dataset is
+  // a rolling "next 12 months from today" window that shifts every day, so a
+  // hardcoded month list would drift out of sync. Always derived from the
+  // full `games` set (not `filtered`), same as the platform/genre chip lists
+  // above always showing every option regardless of what else is active.
+  const monthChips = useMemo(() => {
+    const seen = new Map();
+    games.forEach((g) => {
+      const key = `${g.date[0]}-${g.date[1]}`;
+      if (!seen.has(key)) seen.set(key, { y: g.date[0], m: g.date[1] });
+    });
+    const months = [...seen.entries()]
+      .sort(([, a], [, b]) => (a.y !== b.y ? a.y - b.y : a.m - b.m))
+      .map(([key, { y, m }]) => ({ key, label: `${MONTH_NAMES[m].slice(0, 3)} ${y}` }));
+    return [{ key: 'all', label: 'All Months' }, ...months];
+  }, [games]);
 
   if (loading) {
     return (
@@ -130,6 +151,20 @@ export default function CalendarScreen() {
         ))}
       </ScrollView>
 
+      {monthChips.length > 1 && (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filtersTertiary} contentContainerStyle={{ gap: 8, paddingHorizontal: 16 }}>
+          {monthChips.map((c) => (
+            <Pressable
+              key={c.key}
+              onPress={() => setActiveMonth(c.key)}
+              style={[styles.monthChip, activeMonth === c.key && styles.monthChipActive]}
+            >
+              <Text style={[styles.monthChipText, activeMonth === c.key && styles.monthChipTextActive]}>{c.label}</Text>
+            </Pressable>
+          ))}
+        </ScrollView>
+      )}
+
       <View style={styles.sectionHead}>
         <Text style={styles.sectionTitle}>UPCOMING RELEASES</Text>
         <Text style={styles.sectionCount}>{filtered.length} TITLES</Text>
@@ -155,7 +190,7 @@ export default function CalendarScreen() {
         )}
         ListHeaderComponent={ListHeader}
         ListEmptyComponent={
-          <Text style={styles.emptyText}>Nothing here for this combination yet — try a different platform or genre.</Text>
+          <Text style={styles.emptyText}>Nothing here for this combination yet — try a different platform, genre, or month.</Text>
         }
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
@@ -210,6 +245,11 @@ const styles = StyleSheet.create({
   genreChipActive: { backgroundColor: colors.orangeDim, borderColor: colors.orange },
   genreChipText: { fontFamily: 'Inter_500Medium', fontSize: 11.5, color: colors.mutedDim },
   genreChipTextActive: { color: colors.orange, fontFamily: 'Inter_600SemiBold' },
+  filtersTertiary: { borderBottomWidth: 1, borderBottomColor: colors.line, paddingTop: 4, paddingBottom: 14 },
+  monthChip: { paddingHorizontal: 13, paddingVertical: 6.5, borderRadius: 999, backgroundColor: colors.bgCard, borderWidth: 1, borderColor: colors.line },
+  monthChipActive: { backgroundColor: colors.blue, borderColor: colors.blue },
+  monthChipText: { fontFamily: 'Inter_500Medium', fontSize: 11.5, color: colors.mutedDim },
+  monthChipTextActive: { color: colors.white, fontFamily: 'Inter_600SemiBold' },
   listContent: { paddingBottom: 100 },
   sectionHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 4, marginTop: 4, paddingHorizontal: 16, paddingTop: 16 },
   sectionTitle: { fontFamily: 'Poppins_800ExtraBold', fontSize: 15, letterSpacing: 0.5, color: colors.white },

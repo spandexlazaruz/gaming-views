@@ -30,7 +30,20 @@ export default function GameCard({ game, highlightPlatform, showReminder }) {
   return (
     <Pressable
       style={styles.card}
-      onPress={() => router.push(`/game/${encodeURIComponent(game.title)}`)}
+      onPress={() => router.push(
+        // Carry the active platform filter (if any) through to the detail
+        // screen as a query param, so its own ADD TO WATCHLIST button can
+        // record the same platform GameCard's own heart toggle already does
+        // (see toggleWatchlist(title, platform) calls below). Without this,
+        // tapping into a game from e.g. a PS5-filtered list and adding it
+        // from the detail page instead of the card's heart icon silently
+        // fell back to the game's first-listed platform on Watchlist/Search
+        // — same root cause as fix log item 4, this closes the one path
+        // that fix didn't originally cover.
+        highlightPlatform
+          ? `/game/${encodeURIComponent(game.title)}?platform=${highlightPlatform}`
+          : `/game/${encodeURIComponent(game.title)}`
+      )}
     >
       {game.coverUrl ? (
         <View style={styles.thumb}>

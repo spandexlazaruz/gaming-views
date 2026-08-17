@@ -12,7 +12,12 @@ import GameCard from '../../components/GameCard';
 import QuickNavBar from '../../components/QuickNavBar';
 
 export default function GameDetailScreen() {
-  const { title } = useLocalSearchParams();
+  const { title, platform } = useLocalSearchParams();
+  // GameCard passes its active platform filter through as a query param when
+  // navigating here (see components/GameCard.js) — undefined on paths with
+  // no active filter, same as before. Defensive Array.isArray check since
+  // useLocalSearchParams can hand back an array if a param key ever repeats.
+  const arrivedPlatform = Array.isArray(platform) ? platform[0] : platform;
   const router = useRouter();
   const { games, loading } = useGames();
   const { saved, toggleWatchlist, reminders, setReminderLead } = useWatchlist();
@@ -115,7 +120,7 @@ export default function GameDetailScreen() {
               // repeat calls after the first grant/deny), so this is safe to
               // call on every add, not just a tracked "first time".
               const wasSaved = isSaved;
-              toggleWatchlist(game.title);
+              toggleWatchlist(game.title, arrivedPlatform);
               if (!wasSaved) {
                 ensureNotificationPermission().catch(() => {});
               }
