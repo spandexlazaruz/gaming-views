@@ -2,11 +2,19 @@ import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useWatchlist } from '../lib/WatchlistContext';
+import { useGames } from '../lib/GamesContext';
+import { resolvedWatchlistCount } from '../lib/watchlistUtils';
 import { colors } from '../lib/theme';
 
 export default function QuickNavBar() {
   const router = useRouter();
   const { saved } = useWatchlist();
+  const { games } = useGames();
+  // Same fix as app/(tabs)/_layout.js's tab badge — this bar is a separate,
+  // manually-built component (not the shared Tabs navigator), so it had its
+  // own independent copy of the stale-count bug. Keep both in sync if this
+  // logic ever changes again.
+  const watchlistCount = resolvedWatchlistCount(saved, games);
 
   return (
     <SafeAreaView edges={['bottom']} style={{ backgroundColor: colors.bgNav }}>
@@ -18,9 +26,9 @@ export default function QuickNavBar() {
         <Pressable style={styles.tab} onPress={() => router.dismissTo('/(tabs)/watchlist')}>
           <View>
             <Text style={styles.icon}>❤️</Text>
-            {saved.size > 0 && (
+            {watchlistCount > 0 && (
               <View style={styles.badge}>
-                <Text style={styles.badgeText}>{saved.size}</Text>
+                <Text style={styles.badgeText}>{watchlistCount}</Text>
               </View>
             )}
           </View>

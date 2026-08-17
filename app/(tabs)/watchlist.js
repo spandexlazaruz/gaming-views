@@ -21,7 +21,11 @@ export default function WatchlistScreen() {
     <View style={styles.container}>
       <View style={styles.top}>
         <Text style={styles.title}>Your Watchlist</Text>
-        <Text style={styles.count}>{saved.size} GAME{saved.size !== 1 ? 'S' : ''}</Text>
+        {/* Reflects `items` (what's actually rendered below), not the raw
+            saved.size — a title stops resolving once its game drops out of
+            the live dataset (e.g. past its release date), and the count
+            needs to follow that, not just the add/remove tally. */}
+        <Text style={styles.count}>{items.length} GAME{items.length !== 1 ? 'S' : ''}</Text>
       </View>
 
       {items.length === 0 ? (

@@ -1,6 +1,8 @@
 import { Tabs } from 'expo-router';
 import { Text } from 'react-native';
 import { useWatchlist } from '../../lib/WatchlistContext';
+import { useGames } from '../../lib/GamesContext';
+import { resolvedWatchlistCount } from '../../lib/watchlistUtils';
 import { colors } from '../../lib/theme';
 import TopBar from '../../components/TopBar';
 
@@ -12,6 +14,10 @@ function TabIcon({ symbol, focused }) {
 
 export default function TabsLayout() {
   const { saved } = useWatchlist();
+  const { games } = useGames();
+  // Badge reflects what's actually visible on the Watchlist screen, not the
+  // raw persisted count — see lib/watchlistUtils.js for why those can differ.
+  const watchlistCount = resolvedWatchlistCount(saved, games);
 
   return (
     <Tabs
@@ -43,7 +49,7 @@ export default function TabsLayout() {
         options={{
           title: 'Watchlist',
           tabBarIcon: ({ focused }) => <TabIcon symbol="❤️" focused={focused} />,
-          tabBarBadge: saved.size > 0 ? saved.size : undefined,
+          tabBarBadge: watchlistCount > 0 ? watchlistCount : undefined,
           tabBarBadgeStyle: { backgroundColor: colors.orange, color: '#1A0F00', fontSize: 9.5, fontFamily: 'Inter_600SemiBold' },
         }}
       />
