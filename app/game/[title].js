@@ -1,8 +1,10 @@
-import { View, Text, ScrollView, Pressable, Image, StyleSheet } from 'react-native';
+import { useState } from 'react';
+import { View, Text, ScrollView, Pressable, Image, StyleSheet, Modal, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { colors, PLATFORMS, posterThemes, hashStr } from '../../lib/theme';
+import { STORE_LABELS, storeSearchUrl } from '../../lib/stores';
 import { useGames } from '../../lib/GamesContext';
 import { LoadingState } from '../../lib/StateViews';
 import { daysUntil, formatDate, MONTH_NAMES } from '../../lib/dates';
@@ -21,6 +23,7 @@ export default function GameDetailScreen() {
   const router = useRouter();
   const { games, loading } = useGames();
   const { saved, toggleWatchlist, reminders, setReminderLead } = useWatchlist();
+  const [storePickerOpen, setStorePickerOpen] = useState(false);
 
   const game = games.find((g) => g.title === decodeURIComponent(title));
 
@@ -62,6 +65,24 @@ export default function GameDetailScreen() {
   ).slice(0, 3);
 
   const blurb = game.desc || `A ${game.genre.toLowerCase()} title releasing on ${formatDate(game.date)} for ${game.platforms.map((p) => PLATFORMS[p].full).join(', ')}.`;
+
+  // These are generic storefront search links, not deep links to this exact
+  // product page — see lib/stores.js for why. Single-platform games skip the
+  // picker and go straight to that one store; multi-platform games get a
+  // small picker so the tap always lands on the right storefront.
+  const openStore = (platformKey) => {
+    const url = storeSearchUrl(platformKey, game.title);
+    if (url) Linking.openURL(url).catch(() => {});
+    setStorePickerOpen(false);
+  };
+
+  const handleViewInStorePress = () => {
+    if (game.platforms.length === 1) {
+      openStore(game.platforms[0]);
+    } else {
+      setStorePickerOpen(true);
+    }
+  };
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -106,6 +127,10 @@ export default function GameDetailScreen() {
               </View>
             ))}
           </View>
+
+          <Pressable style={styles.storeBtn} onPress={handleViewInStorePress}>
+            <Text style={styles.storeBtnText}>🔗 VIEW IN STORE</Text>
+          </Pressable>
 
           <Pressable
             style={[styles.cta, isSaved && styles.ctaSaved]}
@@ -196,6 +221,29 @@ export default function GameDetailScreen() {
           )}
         </View>
       </ScrollView>
+
+      <Modal
+        visible={storePickerOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setStorePickerOpen(false)}
+      >
+        <Pressable style={styles.storeModalBackdrop} onPress={() => setStorePickerOpen(false)}>
+          <View style={styles.storeSheet}>
+            <Text style={styles.storeSheetTitle}>VIEW IN STORE</Text>
+            {game.platforms.map((p) => (
+              <Pressable key={p} style={styles.storeSheetRow} onPress={() => openStore(p)}>
+                <View style={[styles.dot, { backgroundColor: PLATFORMS[p].color }]} />
+                <Text style={styles.storeSheetRowText}>{STORE_LABELS[p]}</Text>
+              </Pressable>
+            ))}
+            <Pressable style={styles.storeSheetCancel} onPress={() => setStorePickerOpen(false)}>
+              <Text style={styles.storeSheetCancelText}>CANCEL</Text>
+            </Pressable>
+          </View>
+        </Pressable>
+      </Modal>
+
       <QuickNavBar />
     </SafeAreaView>
   );
@@ -247,6 +295,30 @@ const styles = StyleSheet.create({
   },
   dot: { width: 8, height: 8, borderRadius: 4 },
   platChipText: { fontSize: 11.5, fontFamily: 'Inter_600SemiBold', color: colors.white },
+  storeBtn: {
+    backgroundColor: colors.bgCard, borderWidth: 1, borderColor: colors.line,
+    borderRadius: 11, padding: 13, alignItems: 'center', marginBottom: 12,
+  },
+  storeBtnText: { fontFamily: 'Inter_600SemiBold', fontSize: 12.5, color: colors.white, letterSpacing: 0.3 },
+  storeModalBackdrop: {
+    flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end',
+  },
+  storeSheet: {
+    backgroundColor: colors.bgNav, borderTopLeftRadius: 16, borderTopRightRadius: 16,
+    padding: 18, paddingBottom: 28, borderTopWidth: 1, borderColor: colors.line,
+  },
+  storeSheetTitle: {
+    fontSize: 11.5, fontFamily: 'Inter_600SemiBold', color: colors.mutedDim,
+    letterSpacing: 1, marginBottom: 14,
+  },
+  storeSheetRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    backgroundColor: colors.bgCard, borderWidth: 1, borderColor: colors.line,
+    borderRadius: 11, padding: 14, marginBottom: 8,
+  },
+  storeSheetRowText: { fontFamily: 'Inter_600SemiBold', fontSize: 14, color: colors.white },
+  storeSheetCancel: { alignItems: 'center', padding: 12, marginTop: 4 },
+  storeSheetCancelText: { fontFamily: 'Inter_600SemiBold', fontSize: 13, color: colors.muted },
   cta: { backgroundColor: colors.orange, borderRadius: 11, padding: 15, alignItems: 'center', marginBottom: 20 },
   ctaSaved: { backgroundColor: 'transparent', borderWidth: 1.5, borderColor: colors.orange },
   ctaText: { fontFamily: 'Poppins_700Bold', fontSize: 14, color: '#1A0F00' },
