@@ -24,6 +24,7 @@ export default function GameDetailScreen() {
   const { games, loading } = useGames();
   const { saved, toggleWatchlist, reminders, setReminderLead } = useWatchlist();
   const [storePickerOpen, setStorePickerOpen] = useState(false);
+  const [storeChecking, setStoreChecking] = useState(false);
 
   const game = games.find((g) => g.title === decodeURIComponent(title));
 
@@ -67,18 +68,28 @@ export default function GameDetailScreen() {
   const blurb = game.desc || `A ${game.genre.toLowerCase()} title releasing on ${formatDate(game.date)} for ${game.platforms.map((p) => PLATFORMS[p].full).join(', ')}.`;
 
   // Opens the exact store product page when the backend found one for this
-  // game (game.storeLinks, sourced from IGDB's external_games data) — falls
-  // back to a plain store search otherwise (see lib/stores.js). Single-
-  // platform games skip the picker and go straight to that one store;
-  // multi-platform games get a small picker so the tap always lands on the
-  // right storefront.
-  const openStore = (platformKey) => {
-    const url = resolveStoreUrl(platformKey, game.title, game.storeLinks);
-    if (url) Linking.openURL(url).catch(() => {});
+  // game (game.storeLinks, sourced from IGDB's external_games data) AND it
+  // still resolves to a real page — falls back to a plain store search
+  // otherwise (see lib/stores.js's live-check logic). Single-platform games
+  // skip the picker and go straight to that one store; multi-platform games
+  // get a small picker so the tap always lands on the right storefront.
+  // Async now (resolveStoreUrl does a real network check before returning),
+  // so this guards against double-taps and drives the button's loading
+  // state below.
+  const openStore = async (platformKey) => {
+    if (storeChecking) return;
     setStorePickerOpen(false);
+    setStoreChecking(true);
+    try {
+      const url = await resolveStoreUrl(platformKey, game.title, game.storeLinks);
+      if (url) Linking.openURL(url).catch(() => {});
+    } finally {
+      setStoreChecking(false);
+    }
   };
 
   const handleViewInStorePress = () => {
+    if (storeChecking) return;
     if (game.platforms.length === 1) {
       openStore(game.platforms[0]);
     } else {
@@ -130,8 +141,14 @@ export default function GameDetailScreen() {
             ))}
           </View>
 
-          <Pressable style={styles.storeBtn} onPress={handleViewInStorePress}>
-            <Text style={styles.storeBtnText}>🔗 VIEW IN STORE</Text>
+          <Pressable
+            style={[styles.storeBtn, storeChecking && styles.storeBtnDisabled]}
+            onPress={handleViewInStorePress}
+            disabled={storeChecking}
+          >
+            <Text style={styles.storeBtnText}>
+              {storeChecking ? 'CHECKING…' : '🔗 VIEW IN STORE'}
+            </Text>
           </Pressable>
 
           <Pressable
@@ -234,7 +251,12 @@ export default function GameDetailScreen() {
           <View style={styles.storeSheet}>
             <Text style={styles.storeSheetTitle}>VIEW IN STORE</Text>
             {game.platforms.map((p) => (
-              <Pressable key={p} style={styles.storeSheetRow} onPress={() => openStore(p)}>
+              <Pressable
+                key={p}
+                style={styles.storeSheetRow}
+                onPress={() => openStore(p)}
+                disabled={storeChecking}
+              >
                 <View style={[styles.dot, { backgroundColor: PLATFORMS[p].color }]} />
                 <Text style={styles.storeSheetRowText}>{STORE_LABELS[p]}</Text>
               </Pressable>
@@ -302,6 +324,7 @@ const styles = StyleSheet.create({
     borderRadius: 11, padding: 13, alignItems: 'center', marginBottom: 12,
   },
   storeBtnText: { fontFamily: 'Inter_600SemiBold', fontSize: 12.5, color: colors.white, letterSpacing: 0.3 },
+  storeBtnDisabled: { opacity: 0.5 },
   storeModalBackdrop: {
     flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end',
   },
