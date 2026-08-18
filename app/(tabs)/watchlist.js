@@ -10,7 +10,7 @@ import GameCard from '../../components/GameCard';
 export default function WatchlistScreen() {
   const router = useRouter();
   const { games } = useGames();
-  const { saved, platformContext } = useWatchlist();
+  const { saved } = useWatchlist();
 
   const items = useMemo(
     () => [...saved].map((t) => games.find((g) => g.title === t)).filter(Boolean).sort((a, b) => toDate(a.date) - toDate(b.date)),
@@ -42,7 +42,11 @@ export default function WatchlistScreen() {
           data={items}
           keyExtractor={(item) => item.title}
           renderItem={({ item }) => (
-            <GameCard game={item} showReminder highlightPlatform={platformContext[item.title]} />
+            // multiPlatformBadges: shows every platform this title is
+            // actually saved under (e.g. wishlisted on PS5 and Xbox
+            // separately shows both badges on the one card) instead of a
+            // single arbitrary platform — see components/GameCard.js.
+            <GameCard game={item} showReminder multiPlatformBadges />
           )}
           contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
           showsVerticalScrollIndicator={false}

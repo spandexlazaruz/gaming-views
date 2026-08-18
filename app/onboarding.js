@@ -81,6 +81,7 @@ export default function OnboardingScreen() {
             <Text style={styles.sub}>
               Every upcoming release across PlayStation, Xbox, Switch, and PC — tracked in one clean list. No clutter, no noise.
             </Text>
+            <Text style={styles.familyTag}>A part of the Gaming Views family</Text>
           </>
         )}
 
@@ -183,10 +184,14 @@ const styles = StyleSheet.create({
   skip: { alignSelf: 'flex-end', margin: 16 },
   skipText: { color: colors.muted, fontFamily: 'Inter_600SemiBold', fontSize: 12.5 },
   body: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 26 },
-  logo: { width: 72, height: 72, marginBottom: 20 },
+  logo: { width: 112, height: 112, marginBottom: 22 },
   eyebrow: { color: colors.orange, fontFamily: 'Inter_600SemiBold', fontSize: 12, letterSpacing: 1.5, marginBottom: 8 },
   title: { fontFamily: 'Poppins_800ExtraBold', fontSize: 24, color: colors.white, textAlign: 'center', marginBottom: 12 },
   sub: { fontSize: 14, color: colors.muted, textAlign: 'center', lineHeight: 21, maxWidth: 320 },
+  familyTag: {
+    fontSize: 11.5, color: colors.mutedDim, fontFamily: 'Inter_500Medium',
+    textAlign: 'center', marginTop: 14, letterSpacing: 0.3,
+  },
   bell: {
     width: 56, height: 56, borderRadius: 28, backgroundColor: colors.orangeDim,
     alignItems: 'center', justifyContent: 'center', marginBottom: 18,

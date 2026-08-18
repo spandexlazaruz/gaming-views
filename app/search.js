@@ -4,13 +4,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { colors } from '../lib/theme';
 import { useGames } from '../lib/GamesContext';
-import { useWatchlist } from '../lib/WatchlistContext';
 import GameCard from '../components/GameCard';
 
 export default function SearchScreen() {
   const router = useRouter();
   const { games } = useGames();
-  const { platformContext } = useWatchlist();
   const [query, setQuery] = useState('');
   const inputRef = useRef(null);
 
@@ -60,7 +58,7 @@ export default function SearchScreen() {
         <FlatList
           data={results}
           keyExtractor={(item) => item.title}
-          renderItem={({ item }) => <GameCard game={item} highlightPlatform={platformContext[item.title]} />}
+          renderItem={({ item }) => <GameCard game={item} multiPlatformBadges />}
           contentContainerStyle={styles.body}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}

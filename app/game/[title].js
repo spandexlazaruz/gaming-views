@@ -7,7 +7,7 @@ import { colors, PLATFORMS, posterThemes, hashStr } from '../../lib/theme';
 import { STORE_LABELS, resolveStoreUrl } from '../../lib/stores';
 import { useGames } from '../../lib/GamesContext';
 import { LoadingState } from '../../lib/StateViews';
-import { daysUntil, formatDate, MONTH_NAMES } from '../../lib/dates';
+import { daysUntil, formatDate, formatDateShort, MONTH_NAMES, platformDateGroups } from '../../lib/dates';
 import { useWatchlist, LEAD_OPTIONS } from '../../lib/WatchlistContext';
 import { ensureNotificationPermission } from '../../lib/notifications';
 import GameCard from '../../components/GameCard';
@@ -22,7 +22,7 @@ export default function GameDetailScreen() {
   const arrivedPlatform = Array.isArray(platform) ? platform[0] : platform;
   const router = useRouter();
   const { games, loading } = useGames();
-  const { saved, toggleWatchlist, reminders, setReminderLead } = useWatchlist();
+  const { saved, savedPlatforms, toggleWatchlist, reminders, setReminderLead } = useWatchlist();
   const [storePickerOpen, setStorePickerOpen] = useState(false);
   const [storeChecking, setStoreChecking] = useState(false);
 
@@ -56,9 +56,21 @@ export default function GameDetailScreen() {
     );
   }
 
-  const isSaved = saved.has(game.title);
+  // Arrived via a filtered platform link (see GameCard.js) → that platform's
+  // own saved state, so a game saved on Xbox doesn't read as saved while
+  // looking at it from a PS5-filtered path, and vice versa. Otherwise, "saved
+  // for anything" — same as before.
+  const isSaved = arrivedPlatform
+    ? (savedPlatforms[game.title] || []).includes(arrivedPlatform)
+    : saved.has(game.title);
   const theme = posterThemes[hashStr(game.title) % posterThemes.length];
-  const days = daysUntil(game.date);
+  // A per-platform date only when this game's platforms genuinely differ —
+  // an arrived/filtered platform with its own confirmed date takes priority,
+  // otherwise the breakdown (dateGroups) covers the unfiltered case below.
+  const dateGroups = platformDateGroups(game);
+  const displayDate = (arrivedPlatform && game.platformDates && game.platformDates[arrivedPlatform])
+    || game.date;
+  const days = daysUntil(displayDate);
   const stampText = days <= 0 ? 'OUT NOW' : days === 1 ? 'RELEASES TOMORROW' : `RELEASES IN ${days} DAYS`;
 
   const others = games.filter(
@@ -130,15 +142,26 @@ export default function GameDetailScreen() {
 
         <View style={styles.body}>
           <Text style={styles.title}>{game.title}</Text>
-          <Text style={styles.dateLine}>{formatDate(game.date)} · {game.genre}</Text>
+          <Text style={styles.dateLine}>
+            {dateGroups && !arrivedPlatform
+              ? dateGroups
+                  .map((g) => `${g.platforms.map((p) => PLATFORMS[p].label).join('/')} ${formatDateShort(g.date)}`)
+                  .join('  ·  ')
+              : formatDate(displayDate)}
+            {' '}· {game.genre}
+          </Text>
 
           <View style={styles.platRow}>
-            {game.platforms.map((p) => (
-              <View key={p} style={styles.platChip}>
-                <View style={[styles.dot, { backgroundColor: PLATFORMS[p].color }]} />
-                <Text style={styles.platChipText}>{PLATFORMS[p].full}</Text>
-              </View>
-            ))}
+            {game.platforms.map((p) => {
+              const pd = game.platformDates && game.platformDates[p];
+              return (
+                <View key={p} style={styles.platChip}>
+                  <View style={[styles.dot, { backgroundColor: PLATFORMS[p].color }]} />
+                  <Text style={styles.platChipText}>{PLATFORMS[p].full}</Text>
+                  {dateGroups && pd && <Text style={styles.platChipDate}> · {formatDateShort(pd)}</Text>}
+                </View>
+              );
+            })}
           </View>
 
           <Pressable
@@ -164,7 +187,7 @@ export default function GameDetailScreen() {
               // repeat calls after the first grant/deny), so this is safe to
               // call on every add, not just a tracked "first time".
               const wasSaved = isSaved;
-              toggleWatchlist(game.title, arrivedPlatform);
+              toggleWatchlist(game.title, arrivedPlatform, game.platforms);
               if (!wasSaved) {
                 ensureNotificationPermission().catch(() => {});
               }
@@ -319,6 +342,7 @@ const styles = StyleSheet.create({
   },
   dot: { width: 8, height: 8, borderRadius: 4 },
   platChipText: { fontSize: 11.5, fontFamily: 'Inter_600SemiBold', color: colors.white },
+  platChipDate: { fontSize: 11, fontFamily: 'Inter_500Medium', color: colors.mutedDim },
   storeBtn: {
     backgroundColor: colors.bgCard, borderWidth: 1, borderColor: colors.line,
     borderRadius: 11, padding: 13, alignItems: 'center', marginBottom: 12,

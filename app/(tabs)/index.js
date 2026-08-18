@@ -134,7 +134,7 @@ export default function CalendarScreen() {
           </Text>
           <Pressable
             style={[styles.heroBtn, heroSaved && styles.heroBtnSaved]}
-            onPress={() => toggleWatchlist(hero.title)}
+            onPress={() => toggleWatchlist(hero.title, undefined, hero.platforms)}
           >
             <Text style={[styles.heroBtnText, heroSaved && { color: colors.orange }]}>
               {heroSaved ? '❤️ ADDED TO WATCHLIST' : '🤍 ADD TO WATCHLIST'}

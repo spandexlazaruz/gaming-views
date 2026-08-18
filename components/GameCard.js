@@ -3,13 +3,27 @@ import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { colors, PLATFORMS, posterThemes, hashStr } from '../lib/theme';
-import { daysUntil, formatDateShort } from '../lib/dates';
+import { daysUntil, formatDateShort, platformDateGroups } from '../lib/dates';
 import { useWatchlist, LEAD_OPTIONS } from '../lib/WatchlistContext';
 
-export default function GameCard({ game, highlightPlatform, showReminder }) {
+// `multiPlatformBadges` — when true (only passed from the Watchlist/Search
+// screens), shows every platform this specific title is actually saved
+// under as its own badge, instead of picking just one. Lets "wishlisted on
+// PS5 and Xbox separately" read as one card with two badges, matching how
+// it was explicitly asked for, rather than either losing one platform or
+// splitting into two cards.
+export default function GameCard({ game, highlightPlatform, showReminder, multiPlatformBadges }) {
   const router = useRouter();
-  const { saved, toggleWatchlist, reminders } = useWatchlist();
-  const isSaved = saved.has(game.title);
+  const { saved, savedPlatforms, toggleWatchlist, reminders } = useWatchlist();
+  const titleSavedPlatforms = savedPlatforms[game.title] || [];
+  // Filtered to a specific platform (e.g. the Calendar's active platform
+  // chip) → only that platform's own saved state counts, so a game saved on
+  // Xbox doesn't read as saved while browsing/filtering PS5 for the same
+  // game, and vice versa. No filter in context → falls back to "saved for
+  // anything", same as before.
+  const isSaved = highlightPlatform
+    ? titleSavedPlatforms.includes(highlightPlatform)
+    : titleSavedPlatforms.length > 0;
   // Only meaningful for saved games — showReminder is currently only passed
   // from the Watchlist screen, where every card is saved by definition, but
   // guarding on isSaved keeps this safe if it's ever reused elsewhere.
@@ -17,10 +31,24 @@ export default function GameCard({ game, highlightPlatform, showReminder }) {
     ? (LEAD_OPTIONS.find((o) => o.key === (reminders[game.title] || 'release_day')) || LEAD_OPTIONS[0]).label
     : null;
   const theme = posterThemes[hashStr(game.title) % posterThemes.length];
-  const days = daysUntil(game.date);
-  const primaryPlat = (highlightPlatform && game.platforms.includes(highlightPlatform))
-    ? highlightPlatform
-    : game.platforms[0];
+  // A filtered platform with its own confirmed date uses that date; a game
+  // with genuinely differing per-platform dates but no active filter shows
+  // its full breakdown below instead (dateGroups) rather than one date that
+  // wouldn't be accurate for every platform on the card.
+  const displayDate = (highlightPlatform && game.platformDates && game.platformDates[highlightPlatform])
+    || game.date;
+  const days = daysUntil(displayDate);
+  const dateGroups = !highlightPlatform ? platformDateGroups(game) : null;
+
+  let badgePlatforms;
+  if (highlightPlatform && game.platforms.includes(highlightPlatform)) {
+    badgePlatforms = [highlightPlatform];
+  } else if (multiPlatformBadges && titleSavedPlatforms.length > 0) {
+    const valid = titleSavedPlatforms.filter((p) => game.platforms.includes(p));
+    badgePlatforms = valid.length > 0 ? valid : [game.platforms[0]];
+  } else {
+    badgePlatforms = [game.platforms[0]];
+  }
 
   let badgeText = null;
   if (days <= 14) {
@@ -66,13 +94,17 @@ export default function GameCard({ game, highlightPlatform, showReminder }) {
             start={{ x: 0, y: 0.35 }} end={{ x: 0, y: 1 }}
             style={StyleSheet.absoluteFill}
           />
-          <View style={[styles.platTag, { backgroundColor: PLATFORMS[primaryPlat].color }]}>
-            <Text style={styles.platTagText}>{PLATFORMS[primaryPlat].label}</Text>
+          <View style={styles.platTagRow}>
+            {badgePlatforms.map((p) => (
+              <View key={p} style={[styles.platTag, { backgroundColor: PLATFORMS[p].color }]}>
+                <Text style={styles.platTagText}>{PLATFORMS[p].label}</Text>
+              </View>
+            ))}
           </View>
           <Pressable
             style={styles.saveMini}
             hitSlop={8}
-            onPress={(e) => { e.stopPropagation(); toggleWatchlist(game.title, highlightPlatform); }}
+            onPress={(e) => { e.stopPropagation(); toggleWatchlist(game.title, highlightPlatform, game.platforms); }}
           >
             <Text style={{ fontSize: 12, color: isSaved ? colors.orange : colors.white }}>{isSaved ? '❤️' : '🤍'}</Text>
           </Pressable>
@@ -85,13 +117,17 @@ export default function GameCard({ game, highlightPlatform, showReminder }) {
             start={{ x: 0, y: 0.35 }} end={{ x: 0, y: 1 }}
             style={StyleSheet.absoluteFill}
           />
-          <View style={[styles.platTag, { backgroundColor: PLATFORMS[primaryPlat].color }]}>
-            <Text style={styles.platTagText}>{PLATFORMS[primaryPlat].label}</Text>
+          <View style={styles.platTagRow}>
+            {badgePlatforms.map((p) => (
+              <View key={p} style={[styles.platTag, { backgroundColor: PLATFORMS[p].color }]}>
+                <Text style={styles.platTagText}>{PLATFORMS[p].label}</Text>
+              </View>
+            ))}
           </View>
           <Pressable
             style={styles.saveMini}
             hitSlop={8}
-            onPress={(e) => { e.stopPropagation(); toggleWatchlist(game.title, highlightPlatform); }}
+            onPress={(e) => { e.stopPropagation(); toggleWatchlist(game.title, highlightPlatform, game.platforms); }}
           >
             <Text style={{ fontSize: 12, color: isSaved ? colors.orange : colors.white }}>{isSaved ? '❤️' : '🤍'}</Text>
           </Pressable>
@@ -102,7 +138,15 @@ export default function GameCard({ game, highlightPlatform, showReminder }) {
       <View style={styles.content}>
         <Text numberOfLines={2} style={styles.title}>{game.title}</Text>
         <View style={styles.metaRow}>
-          <Text style={styles.date}>{formatDateShort(game.date)}</Text>
+          {dateGroups ? (
+            <Text style={styles.date} numberOfLines={1}>
+              {dateGroups
+                .map((g) => `${g.platforms.map((p) => PLATFORMS[p].label).join('/')} ${formatDateShort(g.date)}`)
+                .join('  ·  ')}
+            </Text>
+          ) : (
+            <Text style={styles.date}>{formatDateShort(displayDate)}</Text>
+          )}
           <Text style={styles.sep}>·</Text>
           <View style={styles.platDots}>
             {game.platforms.map((p) => (
@@ -157,9 +201,11 @@ const styles = StyleSheet.create({
     position: 'absolute', top: -20, left: -40, width: 60, height: 180,
     backgroundColor: 'rgba(255,255,255,0.06)', transform: [{ rotate: '25deg' }],
   },
+  platTagRow: {
+    position: 'absolute', top: 7, left: 7, flexDirection: 'row', gap: 4, zIndex: 2, maxWidth: '75%', flexWrap: 'wrap',
+  },
   platTag: {
-    position: 'absolute', top: 7, left: 7, borderRadius: 5, paddingHorizontal: 6, paddingVertical: 2.5,
-    zIndex: 2,
+    borderRadius: 5, paddingHorizontal: 6, paddingVertical: 2.5,
   },
   platTagText: { fontSize: 9, fontFamily: 'Inter_600SemiBold', color: '#0A0C10', textTransform: 'uppercase' },
   saveMini: {
