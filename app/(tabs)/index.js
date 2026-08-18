@@ -24,18 +24,32 @@ export default function CalendarScreen() {
   // nothing sensible to persist as a default. Always starts on "All Months".
   const [activeMonth, setActiveMonth] = useState('all');
 
-  const hero = useMemo(() => (games.length ? pickNextRelease(games) : null), [games]);
+  // Games shown on the Calendar screen exclude anything already on the
+  // watchlist — once you've saved a game, the Calendar's job (helping you
+  // decide what to track) is done for it, and it "moves" to the Watchlist
+  // tab instead. Applies everywhere below: the hero pick, the filtered
+  // list, and the month chips — derived once here so all three stay in
+  // sync automatically as `saved` changes (e.g. right after tapping
+  // "ADD TO WATCHLIST", the hero immediately advances to the next
+  // not-yet-saved release).
+  const visibleGames = useMemo(() => games.filter((g) => !saved.has(g.title)), [games, saved]);
+
+  const hero = useMemo(() => (visibleGames.length ? pickNextRelease(visibleGames) : null), [visibleGames]);
   const heroDays = hero ? daysUntil(hero.date) : 0;
+  // Always false by construction now — hero is picked from visibleGames,
+  // which already excludes anything in `saved`. Left in place (rather than
+  // hardcoding the button to its "not saved" state) so this keeps working
+  // correctly on its own if that invariant ever changes.
   const heroSaved = hero ? saved.has(hero.title) : false;
   const heroTheme = hero ? posterThemes[hashStr(hero.title) % posterThemes.length] : posterThemes[0];
 
   const filtered = useMemo(
-    () => games.filter((g) =>
+    () => visibleGames.filter((g) =>
       (activePlatform === 'all' || g.platforms.includes(activePlatform)) &&
       (activeGenre === 'all' || g.genreCategory === activeGenre) &&
       (activeMonth === 'all' || `${g.date[0]}-${g.date[1]}` === activeMonth)
     ),
-    [games, activePlatform, activeGenre, activeMonth]
+    [visibleGames, activePlatform, activeGenre, activeMonth]
   );
 
   // SectionList wants { title, data } per section instead of the { label, games }
@@ -61,12 +75,14 @@ export default function CalendarScreen() {
   const genreChips = [{ key: 'all', label: 'All Genres' }, ...GENRES.map((g) => ({ key: g, label: g }))];
   // Built from the live dataset, not a fixed 12-month list — the dataset is
   // a rolling "next 12 months from today" window that shifts every day, so a
-  // hardcoded month list would drift out of sync. Always derived from the
-  // full `games` set (not `filtered`), same as the platform/genre chip lists
-  // above always showing every option regardless of what else is active.
+  // hardcoded month list would drift out of sync. Derived from `visibleGames`
+  // (not `filtered`), same as the platform/genre chip lists above always
+  // showing every option regardless of what else is active — but still
+  // excludes watchlisted games, same as everything else on this screen, so a
+  // month with only saved releases in it doesn't show an empty-feeling chip.
   const monthChips = useMemo(() => {
     const seen = new Map();
-    games.forEach((g) => {
+    visibleGames.forEach((g) => {
       const key = `${g.date[0]}-${g.date[1]}`;
       if (!seen.has(key)) seen.set(key, { y: g.date[0], m: g.date[1] });
     });
@@ -74,7 +90,7 @@ export default function CalendarScreen() {
       .sort(([, a], [, b]) => (a.y !== b.y ? a.y - b.y : a.m - b.m))
       .map(([key, { y, m }]) => ({ key, label: `${MONTH_NAMES[m].slice(0, 3)} ${y}` }));
     return [{ key: 'all', label: 'All Months' }, ...months];
-  }, [games]);
+  }, [visibleGames]);
 
   if (loading) {
     return (
@@ -190,7 +206,11 @@ export default function CalendarScreen() {
         )}
         ListHeaderComponent={ListHeader}
         ListEmptyComponent={
-          <Text style={styles.emptyText}>Nothing here for this combination yet — try a different platform, genre, or month.</Text>
+          <Text style={styles.emptyText}>
+            {games.length > 0 && visibleGames.length === 0
+              ? "You've added every upcoming release to your watchlist — check there instead."
+              : 'Nothing here for this combination yet — try a different platform, genre, or month.'}
+          </Text>
         }
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
