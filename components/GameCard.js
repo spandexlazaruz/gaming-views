@@ -55,6 +55,21 @@ export default function GameCard({ game, highlightPlatform, showReminder, multiP
     badgeText = days <= 0 ? 'OUT NOW' : days === 1 ? 'TOMORROW' : `${days} DAYS`;
   }
 
+  // The small platform dots next to the date are meant as "which platforms
+  // does this game release on" info — useful while browsing Calendar/Search
+  // before a game's even saved. But on a multiPlatformBadges card (Watchlist/
+  // Search) for a game that IS saved, showing every release platform here
+  // directly contradicts the badge above it, which correctly shows only the
+  // platform(s) actually wishlisted — reads as "also wishlisted on these"
+  // even though it isn't. Scope the dots to match the badge in that specific
+  // case; every other case (not yet saved, or no multiPlatformBadges context)
+  // keeps showing the full release-platform list as before.
+  let dotPlatforms = game.platforms;
+  if (multiPlatformBadges && isSaved) {
+    const savedOnly = game.platforms.filter((p) => titleSavedPlatforms.includes(p));
+    if (savedOnly.length > 0) dotPlatforms = savedOnly;
+  }
+
   return (
     <Pressable
       style={styles.card}
@@ -149,7 +164,7 @@ export default function GameCard({ game, highlightPlatform, showReminder, multiP
           )}
           <Text style={styles.sep}>·</Text>
           <View style={styles.platDots}>
-            {game.platforms.map((p) => (
+            {dotPlatforms.map((p) => (
               <View key={p} style={[styles.dot, { backgroundColor: PLATFORMS[p].color }]} />
             ))}
           </View>
