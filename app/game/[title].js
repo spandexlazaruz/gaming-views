@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { colors, PLATFORMS, posterThemes, hashStr } from '../../lib/theme';
-import { STORE_LABELS, storeSearchUrl } from '../../lib/stores';
+import { STORE_LABELS, resolveStoreUrl } from '../../lib/stores';
 import { useGames } from '../../lib/GamesContext';
 import { LoadingState } from '../../lib/StateViews';
 import { daysUntil, formatDate, MONTH_NAMES } from '../../lib/dates';
@@ -66,12 +66,14 @@ export default function GameDetailScreen() {
 
   const blurb = game.desc || `A ${game.genre.toLowerCase()} title releasing on ${formatDate(game.date)} for ${game.platforms.map((p) => PLATFORMS[p].full).join(', ')}.`;
 
-  // These are generic storefront search links, not deep links to this exact
-  // product page — see lib/stores.js for why. Single-platform games skip the
-  // picker and go straight to that one store; multi-platform games get a
-  // small picker so the tap always lands on the right storefront.
+  // Opens the exact store product page when the backend found one for this
+  // game (game.storeLinks, sourced from IGDB's external_games data) — falls
+  // back to a plain store search otherwise (see lib/stores.js). Single-
+  // platform games skip the picker and go straight to that one store;
+  // multi-platform games get a small picker so the tap always lands on the
+  // right storefront.
   const openStore = (platformKey) => {
-    const url = storeSearchUrl(platformKey, game.title);
+    const url = resolveStoreUrl(platformKey, game.title, game.storeLinks);
     if (url) Linking.openURL(url).catch(() => {});
     setStorePickerOpen(false);
   };
