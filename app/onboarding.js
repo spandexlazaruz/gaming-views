@@ -184,7 +184,7 @@ const styles = StyleSheet.create({
   skip: { alignSelf: 'flex-end', margin: 16 },
   skipText: { color: colors.muted, fontFamily: 'Inter_600SemiBold', fontSize: 12.5 },
   body: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 26 },
-  logo: { width: 112, height: 112, marginBottom: 22 },
+  logo: { width: 190, height: 190, marginBottom: 22 },
   eyebrow: { color: colors.orange, fontFamily: 'Inter_600SemiBold', fontSize: 12, letterSpacing: 1.5, marginBottom: 8 },
   title: { fontFamily: 'Poppins_800ExtraBold', fontSize: 24, color: colors.white, textAlign: 'center', marginBottom: 12 },
   sub: { fontSize: 14, color: colors.muted, textAlign: 'center', lineHeight: 21, maxWidth: 320 },
