@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react';
-import { View, Text, ScrollView, Pressable, Image, StyleSheet, Modal, Linking, Dimensions } from 'react-native';
+import { useEffect, useState, useRef } from 'react';
+import { View, Text, ScrollView, Pressable, Image, StyleSheet, Modal, Linking, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as ScreenOrientation from 'expo-screen-orientation';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { colors, PLATFORMS, posterThemes, hashStr } from '../../lib/theme';
 import { STORE_LABELS, resolveStoreUrl } from '../../lib/stores';
@@ -45,8 +46,6 @@ import QuickNavBar from '../../components/QuickNavBar';
 // used as BOTH the WebView's `baseUrl` and the iframe's `origin` param, so
 // the two signals YouTube compares actually agree with each other.
 const EMBED_ORIGIN = 'https://localhost';
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 // ADDED 2026-08-20 (fix, game detail page enrichment — item 26, screenshots
 // half): the thumbnail row deliberately uses the smaller t_screenshot_big
@@ -121,6 +120,14 @@ export default function GameDetailScreen() {
   const [descMeasured, setDescMeasured] = useState(false);
   const [trailerPlaying, setTrailerPlaying] = useState(false);
   const [screenshotViewerIndex, setScreenshotViewerIndex] = useState(null);
+  // ADDED 2026-08-20 (screenshot full-screen rotation): reactive to actual
+  // rotation, unlike a one-time Dimensions.get('window') snapshot — the
+  // whole point of this feature is that width/height need to update DURING
+  // the session as the device rotates, not just reflect whatever orientation
+  // was current on first mount.
+  const { width: screenW, height: screenH } = useWindowDimensions();
+  const screenshotViewerOpen = screenshotViewerIndex !== null;
+  const screenshotScrollRef = useRef(null);
 
   const game = games.find((g) => g.title === decodeURIComponent(title));
 
@@ -131,6 +138,37 @@ export default function GameDetailScreen() {
     setTrailerPlaying(false);
     setScreenshotViewerIndex(null);
   }, [title]);
+
+  // ADDED 2026-08-20 (screenshot full-screen rotation): this is the one
+  // screen in the whole app that allows rotation at all — everywhere else
+  // stays portrait-locked by the app-wide lock in app/_layout.js. Unlocks
+  // only while the full-screen viewer is actually open, and relocks to
+  // portrait the moment it closes (covers both the explicit close button and
+  // any other way this effect's cleanup runs, e.g. navigating away). Keyed
+  // on screenshotViewerOpen rather than the raw index so paging between
+  // screenshots while the viewer stays open doesn't re-trigger the
+  // unlock/lock calls.
+  useEffect(() => {
+    if (!screenshotViewerOpen) return;
+    ScreenOrientation.unlockAsync().catch(() => {});
+    return () => {
+      ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch(() => {});
+    };
+  }, [screenshotViewerOpen]);
+
+  // ADDED 2026-08-20 (screenshot full-screen rotation): a horizontally
+  // paging ScrollView's contentOffset prop only applies on its own first
+  // mount, not on later width changes — so without this, rotating the
+  // device mid-view would resize every page to the new width/height but
+  // leave the scroll position at its old pixel offset, landing between
+  // screenshots or on the wrong one. Re-syncing to the current index's
+  // offset (in the new width) whenever screenW changes keeps the same
+  // screenshot in view across a rotation. animated: false since this is a
+  // layout correction, not a user-driven page change.
+  useEffect(() => {
+    if (!screenshotViewerOpen) return;
+    screenshotScrollRef.current?.scrollTo({ x: screenshotViewerIndex * screenW, animated: false });
+  }, [screenW, screenshotViewerOpen]);
 
   const FixedHeader = (
     <View style={styles.headerBar}>
@@ -412,6 +450,16 @@ export default function GameDetailScreen() {
                     source={{ html: youtubeEmbedHtml(game.videoId), baseUrl: EMBED_ORIGIN }}
                     allowsInlineMediaPlayback
                     mediaPlaybackRequiresUserAction={false}
+                    // ADDED 2026-08-20 (fix): the embed's fullscreen button
+                    // did nothing on Android, worked fine on iOS. Confirmed,
+                    // not guessed — allowsFullscreenVideo is an Android-only
+                    // react-native-webview prop, defaults to false, and
+                    // controls whether the WebView honors a page's fullscreen
+                    // request at all. iOS's WKWebView doesn't need an
+                    // equivalent flag (handled natively alongside
+                    // allowsInlineMediaPlayback above), which is exactly why
+                    // this only showed up on Android.
+                    allowsFullscreenVideo
                   />
                 ) : (
                   <Pressable style={StyleSheet.absoluteFill} onPress={() => setTrailerPlaying(true)}>
@@ -514,21 +562,22 @@ export default function GameDetailScreen() {
           {screenshotViewerIndex !== null && game.screenshots && (
             <>
               <ScrollView
+                ref={screenshotScrollRef}
                 style={styles.screenshotViewerScroll}
                 horizontal
                 pagingEnabled
                 showsHorizontalScrollIndicator={false}
-                contentOffset={{ x: screenshotViewerIndex * SCREEN_WIDTH, y: 0 }}
+                contentOffset={{ x: screenshotViewerIndex * screenW, y: 0 }}
                 onMomentumScrollEnd={(e) => {
-                  const i = Math.round(e.nativeEvent.contentOffset.x / SCREEN_WIDTH);
+                  const i = Math.round(e.nativeEvent.contentOffset.x / screenW);
                   setScreenshotViewerIndex(i);
                 }}
               >
                 {game.screenshots.map((url, i) => (
-                  <View key={url || i} style={styles.screenshotViewerPage}>
+                  <View key={url || i} style={[styles.screenshotViewerPage, { width: screenW, height: screenH }]}>
                     <Image
                       source={{ uri: toLargeScreenshotUrl(url) }}
-                      style={styles.screenshotViewerImage}
+                      style={[styles.screenshotViewerImage, { width: screenW, height: screenH }]}
                       resizeMode="contain"
                     />
                   </View>
@@ -675,8 +724,11 @@ const styles = StyleSheet.create({
   // needs a real parent height to size against for resizeMode="contain" to
   // do anything sensible.
   screenshotViewerScroll: { flex: 1 },
-  screenshotViewerPage: { width: SCREEN_WIDTH, height: '100%', alignItems: 'center', justifyContent: 'center' },
-  screenshotViewerImage: { width: SCREEN_WIDTH, height: '100%' },
+  // width/height applied inline per-render from useWindowDimensions (see
+  // above) rather than fixed here, so a rotation actually changes them —
+  // that's the whole point of this feature, not just a static base size.
+  screenshotViewerPage: { alignItems: 'center', justifyContent: 'center' },
+  screenshotViewerImage: {},
   screenshotViewerCounter: {
     position: 'absolute', bottom: 40, alignSelf: 'center',
     color: colors.muted, fontSize: 12.5, fontFamily: 'Inter_600SemiBold',

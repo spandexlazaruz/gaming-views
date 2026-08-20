@@ -6,6 +6,7 @@ import { View, ActivityIndicator } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as ScreenOrientation from 'expo-screen-orientation';
 import { WatchlistProvider } from '../lib/WatchlistContext';
 import { GamesProvider } from '../lib/GamesContext';
 import { colors } from '../lib/theme';
@@ -58,6 +59,20 @@ export default Sentry.wrap(function RootLayout() {
       }
     })();
   }, [fontsLoaded]);
+
+  // ADDED 2026-08-20 (screenshot full-screen rotation): app.json's top-level
+  // "orientation" was loosened from "portrait" to "default" so the *native*
+  // manifest (Info.plist / AndroidManifest, baked in at build time) actually
+  // permits rotation at all — a runtime ScreenOrientation call can never
+  // widen what the native manifest itself restricts, only work within it.
+  // Loosening that manifest setting means the OS is now willing to rotate
+  // every screen, not just the one that wants it (the full-screen screenshot
+  // viewer in app/game/[title].js) — so this app-wide lock re-establishes
+  // portrait as the default everywhere. That one screen briefly unlocks
+  // itself and relocks on close — see its own effect for why.
+  useEffect(() => {
+    ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch(() => {});
+  }, []);
 
   // ADDED 2026-08-20: GestureHandlerRootView now wraps the whole app —
   // required by react-native-gesture-handler (added for the Watchlist tab's

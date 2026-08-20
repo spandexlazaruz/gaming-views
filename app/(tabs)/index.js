@@ -1,16 +1,57 @@
 import { useState, useMemo } from 'react';
-import { View, Text, Image, SectionList, ScrollView, Pressable, StyleSheet } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
+import { View, Text, SectionList, ScrollView, Pressable, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
-import { colors, PLATFORMS, GENRES, posterThemes, hashStr } from '../../lib/theme';
+import { colors, PLATFORMS, GENRES } from '../../lib/theme';
 import { useGames } from '../../lib/GamesContext';
 import { LoadingState, ErrorState } from '../../lib/StateViews';
-import { daysUntil, formatDate, MONTH_NAMES, effectiveDate } from '../../lib/dates';
+import { daysUntil, MONTH_NAMES, effectiveDate } from '../../lib/dates';
 import { useWatchlist } from '../../lib/WatchlistContext';
 import GameCard from '../../components/GameCard';
+import HeroCarousel from '../../components/HeroCarousel';
 
-function pickNextRelease(games) {
-  return [...games].filter((g) => daysUntil(g.date) >= 0).sort((a, b) => daysUntil(a.date) - daysUntil(b.date))[0] || games[0];
+const HERO_COUNT = 5;
+
+// ADDED 2026-08-20 (Phase 3C — "Gaming Views Recommends" hero carousel):
+// replaces the old pickNextRelease (which just picked the single nearest-
+// date game) as the Calendar screen's hero selection logic. Researched
+// IGDB's fields before building this rather than guessing: `hypes` (a plain
+// integer field right on the standard /games endpoint — see the backend's
+// api/games.js for the fields list and its own comment) is IGDB's purpose-
+// built "how many people have marked this as anticipated" signal, confirmed
+// via a third-party IGDB MCP server's own get_most_anticipated_games tool,
+// which queries exactly `where hypes >= X & first_release_date > now; sort
+// hypes desc;`. Deliberately NOT using IGDB's newer PopScore/
+// popularity_primitives system — that's a separate endpoint requiring its
+// own join, and isn't confirmed to be populated pre-release the way `hypes`
+// reliably is.
+//
+// Ranks by hypes desc, takes the top HERO_COUNT. IGDB's hype data is
+// sometimes sparse for a given dataset/window though — if fewer than
+// HERO_COUNT games have any real hype at all, backfill the remaining slots
+// with the old nearest-release logic (same as pickNextRelease used to do)
+// so the carousel is never emptier than it needs to be. rankIndex is only
+// set on genuinely hype-ranked picks — fallback fill-ins get rankIndex:
+// null, and HeroCarousel.js's own badge logic deliberately shows no rank
+// badge at all for those rather than a fabricated one.
+function pickRecommended(games) {
+  const hyped = [...games]
+    .filter((g) => (g.hypes || 0) > 0)
+    .sort((a, b) => (b.hypes || 0) - (a.hypes || 0))
+    .slice(0, HERO_COUNT);
+
+  const picks = hyped.map((game, rankIndex) => ({ game, rankIndex }));
+
+  if (picks.length < HERO_COUNT) {
+    const already = new Set(picks.map((p) => p.game.title));
+    const fillers = [...games]
+      .filter((g) => !already.has(g.title) && daysUntil(g.date) >= 0)
+      .sort((a, b) => daysUntil(a.date) - daysUntil(b.date))
+      .slice(0, HERO_COUNT - picks.length)
+      .map((game) => ({ game, rankIndex: null }));
+    picks.push(...fillers);
+  }
+
+  return picks;
 }
 
 export default function CalendarScreen() {
@@ -34,14 +75,10 @@ export default function CalendarScreen() {
   // not-yet-saved release).
   const visibleGames = useMemo(() => games.filter((g) => !saved.has(g.title)), [games, saved]);
 
-  const hero = useMemo(() => (visibleGames.length ? pickNextRelease(visibleGames) : null), [visibleGames]);
-  const heroDays = hero ? daysUntil(hero.date) : 0;
-  // Always false by construction now — hero is picked from visibleGames,
-  // which already excludes anything in `saved`. Left in place (rather than
-  // hardcoding the button to its "not saved" state) so this keeps working
-  // correctly on its own if that invariant ever changes.
-  const heroSaved = hero ? saved.has(hero.title) : false;
-  const heroTheme = hero ? posterThemes[hashStr(hero.title) % posterThemes.length] : posterThemes[0];
+  // Picked from visibleGames, same as the old hero was — a game already on
+  // the watchlist has no business still showing up as a "recommendation" to
+  // add it.
+  const recommended = useMemo(() => pickRecommended(visibleGames), [visibleGames]);
 
   // ADDED 2026-08-19 (bug fix): both the month-filter match below and the
   // section grouping/sort further down now key off `effectiveDate(g,
@@ -130,38 +167,12 @@ export default function CalendarScreen() {
 
   const ListHeader = (
     <>
-      {hero && (
-        <View style={styles.hero}>
-          {hero.coverUrl ? (
-            <Image source={{ uri: hero.coverUrl }} style={StyleSheet.absoluteFill} resizeMode="cover" />
-          ) : (
-            <LinearGradient colors={heroTheme} start={{ x: 0.15, y: 0 }} end={{ x: 0.9, y: 1 }} style={StyleSheet.absoluteFill} />
-          )}
-          <LinearGradient
-            colors={['rgba(10,12,16,0.15)', 'rgba(10,12,16,0.65)', 'rgba(10,12,16,0.94)']}
-            start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }}
-            style={StyleSheet.absoluteFill}
-          />
-          <Text style={styles.eyebrow}>NEXT UP</Text>
-          <Pressable onPress={() => router.push(`/game/${encodeURIComponent(hero.title)}`)}>
-            <Text style={styles.heroTitle}>{hero.title}</Text>
-          </Pressable>
-          <Text style={styles.heroSub}>
-            Releasing on {hero.platforms.map((p) => PLATFORMS[p].full).join(', ')}.
-          </Text>
-          <Text style={styles.heroMeta}>
-            {formatDate(hero.date)} · {heroDays <= 0 ? 'Out today' : heroDays === 1 ? '1 day left' : `${heroDays} days left`}
-          </Text>
-          <Pressable
-            style={[styles.heroBtn, heroSaved && styles.heroBtnSaved]}
-            onPress={() => toggleWatchlist(hero.title, undefined, hero.platforms)}
-          >
-            <Text style={[styles.heroBtnText, heroSaved && { color: colors.orange }]}>
-              {heroSaved ? '❤️ ADDED TO WATCHLIST' : '🤍 ADD TO WATCHLIST'}
-            </Text>
-          </Pressable>
-        </View>
-      )}
+      <HeroCarousel
+        recommended={recommended}
+        saved={saved}
+        toggleWatchlist={toggleWatchlist}
+        onOpenGame={(title) => router.push(`/game/${encodeURIComponent(title)}`)}
+      />
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filters} contentContainerStyle={{ gap: 8, paddingHorizontal: 16 }}>
         {platformChips.map((c) => (
@@ -250,31 +261,6 @@ export default function CalendarScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bgPage },
-  hero: {
-    padding: 20, paddingTop: 24,
-    borderBottomWidth: 1, borderBottomColor: colors.line,
-    position: 'relative', overflow: 'hidden',
-    minHeight: 260, justifyContent: 'flex-end',
-  },
-  eyebrow: {
-    color: colors.orange, fontFamily: 'Inter_600SemiBold', fontSize: 12, letterSpacing: 1, marginBottom: 8,
-    textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4,
-  },
-  heroTitle: {
-    fontFamily: 'Poppins_800ExtraBold', fontSize: 26, color: colors.white, marginBottom: 8, maxWidth: 320,
-    textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 6,
-  },
-  heroSub: {
-    color: '#D5D9DE', fontSize: 14, marginBottom: 4, maxWidth: 320, lineHeight: 20,
-    textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4,
-  },
-  heroMeta: {
-    color: '#D5D9DE', fontSize: 12.5, marginBottom: 16,
-    textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4,
-  },
-  heroBtn: { backgroundColor: colors.orange, borderRadius: 9, paddingVertical: 13, alignItems: 'center' },
-  heroBtnSaved: { backgroundColor: 'transparent', borderWidth: 1.5, borderColor: colors.orange },
-  heroBtnText: { fontFamily: 'Poppins_700Bold', fontSize: 13.5, color: '#1A0F00' },
   filters: { borderBottomWidth: 1, borderBottomColor: colors.line, paddingTop: 14, paddingBottom: 10 },
   filtersSecondary: { borderBottomWidth: 1, borderBottomColor: colors.line, paddingTop: 4, paddingBottom: 14 },
   chip: { paddingHorizontal: 15, paddingVertical: 8, borderRadius: 999, backgroundColor: colors.bgCard, borderWidth: 1, borderColor: colors.line },
