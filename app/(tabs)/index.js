@@ -5,7 +5,7 @@ import { useRouter } from 'expo-router';
 import { colors, PLATFORMS, GENRES, posterThemes, hashStr } from '../../lib/theme';
 import { useGames } from '../../lib/GamesContext';
 import { LoadingState, ErrorState } from '../../lib/StateViews';
-import { daysUntil, formatDate, MONTH_NAMES } from '../../lib/dates';
+import { daysUntil, formatDate, MONTH_NAMES, effectiveDate } from '../../lib/dates';
 import { useWatchlist } from '../../lib/WatchlistContext';
 import GameCard from '../../components/GameCard';
 
@@ -43,33 +43,53 @@ export default function CalendarScreen() {
   const heroSaved = hero ? saved.has(hero.title) : false;
   const heroTheme = hero ? posterThemes[hashStr(hero.title) % posterThemes.length] : posterThemes[0];
 
+  // ADDED 2026-08-19 (bug fix): both the month-filter match below and the
+  // section grouping/sort further down now key off `effectiveDate(g,
+  // activePlatform)` instead of the game's raw aggregate `g.date` — see
+  // lib/dates.js's effectiveDate() for the full story (a real report:
+  // Deadzone Rogue 2, PC Aug 21 but Xbox/PS5 Dec 31, was grouped/sorted
+  // under August even while filtered to PS5, and didn't show up at all
+  // under an explicit December filter, because both checks were still
+  // reading the aggregate earliest-platform date instead of PS5's own).
+  // Resolves to the same `g.date` as before whenever activePlatform is
+  // 'all' or the game has no per-platform breakdown — no behavior change
+  // for the common case.
   const filtered = useMemo(
-    () => visibleGames.filter((g) =>
-      (activePlatform === 'all' || g.platforms.includes(activePlatform)) &&
-      (activeGenre === 'all' || g.genreCategory === activeGenre) &&
-      (activeMonth === 'all' || `${g.date[0]}-${g.date[1]}` === activeMonth)
-    ),
+    () => visibleGames.filter((g) => {
+      const platformFilter = activePlatform !== 'all' ? activePlatform : null;
+      const d = effectiveDate(g, platformFilter);
+      return (
+        (activePlatform === 'all' || g.platforms.includes(activePlatform)) &&
+        (activeGenre === 'all' || g.genreCategory === activeGenre) &&
+        (activeMonth === 'all' || `${d[0]}-${d[1]}` === activeMonth)
+      );
+    }),
     [visibleGames, activePlatform, activeGenre, activeMonth]
   );
 
   // SectionList wants { title, data } per section instead of the { label, games }
   // shape we used with plain arrays — same grouping logic, different output shape.
   const sections = useMemo(() => {
+    const platformFilter = activePlatform !== 'all' ? activePlatform : null;
     const byMonth = {};
     filtered.forEach((g) => {
-      const key = `${g.date[0]}-${g.date[1]}`;
-      (byMonth[key] = byMonth[key] || []).push(g);
+      const d = effectiveDate(g, platformFilter);
+      const key = `${d[0]}-${d[1]}`;
+      (byMonth[key] = byMonth[key] || []).push({ game: g, sortDate: d });
     });
     return Object.entries(byMonth)
       .sort(([a], [b]) => {
         const [ya, ma] = a.split('-').map(Number), [yb, mb] = b.split('-').map(Number);
         return ya !== yb ? ya - yb : ma - mb;
       })
-      .map(([key, gs]) => {
+      .map(([key, entries]) => {
         const [y, m] = key.split('-').map(Number);
-        return { title: `${MONTH_NAMES[m]} ${y}`, data: gs.sort((a, b) => a.date[2] - b.date[2]) };
+        return {
+          title: `${MONTH_NAMES[m]} ${y}`,
+          data: entries.sort((a, b) => a.sortDate[2] - b.sortDate[2]).map((e) => e.game),
+        };
       });
-  }, [filtered]);
+  }, [filtered, activePlatform]);
 
   const platformChips = [{ key: 'all', label: 'All' }, ...Object.entries(PLATFORMS).map(([k, v]) => ({ key: k, label: v.label }))];
   const genreChips = [{ key: 'all', label: 'All Genres' }, ...GENRES.map((g) => ({ key: g, label: g }))];
