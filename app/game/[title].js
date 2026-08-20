@@ -22,15 +22,30 @@ import QuickNavBar from '../../components/QuickNavBar';
 // youtube.com/embed URL via `source={{ uri }}` is a cross-origin top-level
 // load, and WebViews (WKWebView on iOS especially) commonly don't send a
 // Referer header on that kind of request — YouTube's embed player checks
-// for a valid referrer/origin and refuses to play without one, confirmed
-// against multiple independent sources describing this exact symptom in
-// react-native-webview specifically (not just "YouTube being flaky").
-// Fix: load a tiny local HTML document instead, with the real embed URL
-// inside an <iframe>, via `source={{ html, baseUrl }}` — setting `baseUrl`
-// to a genuine https://www.youtube.com origin gives the iframe's own
-// request a legitimate referrer to send, which is what YouTube's check is
-// actually looking for. No proxy service, no new backend endpoint — both
-// were real options surfaced by the research but heavier than needed here.
+// for a valid referrer/origin and refuses to play without one. Fixed by
+// loading a tiny local HTML document instead, with the real embed URL
+// inside an <iframe>, via `source={{ html, baseUrl }}`.
+//
+// FIXED AGAIN 2026-08-20 (later): that first fix swapped Error 153 for a
+// new, different failure — "Video unavailable," on every video, not an
+// intermittent or per-title thing. Researched rather than re-guessing, since
+// a 100%-reproducing failure after a working fix pointed at the fix itself,
+// not a new IGDB data problem. Found the real mechanism this time: YouTube's
+// IFrame Player API cross-checks the embedding page's actual origin against
+// an `origin` query parameter that's supposed to be passed on the embed URL
+// itself — if the two don't line up, or the claimed origin doesn't look like
+// a legitimate third-party embedder, it can refuse to play. The first fix
+// set `baseUrl` to `https://www.youtube.com` — i.e. had the app's local page
+// impersonate YouTube's own domain, which isn't what a real third-party
+// embed origin looks like, and never set a matching `origin` param on the
+// iframe URL at all, so the one check that actually matters was never even
+// attempted. `EMBED_ORIGIN` below is `https://localhost` — the standard
+// placeholder origin used by established RN YouTube-embed libraries for
+// exactly this case (no real web domain to point at from a mobile app) —
+// used as BOTH the WebView's `baseUrl` and the iframe's `origin` param, so
+// the two signals YouTube compares actually agree with each other.
+const EMBED_ORIGIN = 'https://localhost';
+
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 // ADDED 2026-08-20 (fix, game detail page enrichment — item 26, screenshots
@@ -54,7 +69,7 @@ function youtubeEmbedHtml(videoId) {
   </head>
   <body>
     <iframe
-      src="https://www.youtube.com/embed/${videoId}?autoplay=1&playsinline=1&rel=0"
+      src="https://www.youtube.com/embed/${videoId}?autoplay=1&playsinline=1&rel=0&origin=${EMBED_ORIGIN}"
       frameborder="0"
       allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture"
       allowfullscreen
@@ -394,7 +409,7 @@ export default function GameDetailScreen() {
                   <WebView
                     style={StyleSheet.absoluteFill}
                     originWhitelist={['*']}
-                    source={{ html: youtubeEmbedHtml(game.videoId), baseUrl: 'https://www.youtube.com' }}
+                    source={{ html: youtubeEmbedHtml(game.videoId), baseUrl: EMBED_ORIGIN }}
                     allowsInlineMediaPlayback
                     mediaPlaybackRequiresUserAction={false}
                   />
