@@ -59,6 +59,23 @@ function toLargeScreenshotUrl(url) {
   return url.replace('t_screenshot_big', 't_1080p');
 }
 
+// FIXED 2026-08-20 (still later): Dan found that tapping just to the left or
+// right of the play/pause button (not on it) popped up a small floating
+// "mini player" window over the app — not a bug in this app's own UI, but
+// YouTube's native Picture-in-Picture, which the iframe was explicitly
+// opting into. `allow="picture-in-picture"` is the standard permission
+// YouTube's own official embed snippet includes by default, and it's a real
+// browser-level Permissions Policy grant (confirmed via MDN's
+// Permissions-Policy/picture-in-picture docs): with it present, YouTube's
+// player is free to call the underlying <video> element's
+// requestPictureInPicture() from any of its own tap zones; without it, that
+// call throws a SecurityError and is blocked outright, regardless of which
+// exact spot inside YouTube's own UI triggers it. Since the trailer already
+// plays inside this app's own full-screen modal, there's no legitimate need
+// for the video to be able to float free of it — removed `picture-in-picture`
+// from the `allow` list below. Unrelated to, and doesn't affect, the
+// separate `allowfullscreen`/`allowsFullscreenVideo` fullscreen-button fix
+// above (a different permission, the HTML5 Fullscreen API, not this one).
 function youtubeEmbedHtml(videoId) {
   return `<!DOCTYPE html>
 <html>
@@ -70,7 +87,7 @@ function youtubeEmbedHtml(videoId) {
     <iframe
       src="https://www.youtube.com/embed/${videoId}?autoplay=1&playsinline=1&rel=0&origin=${EMBED_ORIGIN}"
       frameborder="0"
-      allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture"
+      allow="accelerometer; autoplay; encrypted-media; gyroscope"
       allowfullscreen
     ></iframe>
   </body>
