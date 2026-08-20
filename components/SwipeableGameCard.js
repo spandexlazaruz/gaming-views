@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Dimensions, StyleSheet } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
@@ -48,6 +49,23 @@ export default function SwipeableGameCard({ children, onDismiss }) {
   // first onLayout), so the collapse-after-dismiss animation has a real
   // number to animate down to 0 from — you can't animate to/from "auto".
   const height = useSharedValue(null);
+  // ADDED 2026-08-20 (bug fix): React Native's core Pressable (used by
+  // GameCard, the child this wraps) runs on RN's own legacy touch-responder
+  // system, not react-native-gesture-handler's gesture engine — the two
+  // don't automatically negotiate who "wins" a touch. Reported symptom: a
+  // real swipe-to-remove correctly plays the whole dismiss animation AND
+  // separately completes as a tap on the card underneath, navigating into
+  // that game's now-removed detail page right as it disappears. Rather than
+  // fight gesture-arbitration internals (version/platform-fragile), this
+  // just disables the child's touch responder outright — via pointerEvents
+  // — the moment the pan gesture actually activates (see .onStart below,
+  // which for a Pan with activeOffsetX only fires once that threshold is
+  // crossed, i.e. once it's a real swipe and not a tap), so there's no
+  // native touch left for GameCard's Pressable to complete a press with,
+  // regardless of how the gesture ends. Reset on spring-back (not a real
+  // swipe) so ordinary taps keep working the moment the finger lifts off an
+  // aborted/too-small drag.
+  const [locked, setLocked] = useState(false);
 
   const pan = Gesture.Pan()
     // Only "claims" the gesture once the finger has actually moved mostly
@@ -57,6 +75,7 @@ export default function SwipeableGameCard({ children, onDismiss }) {
     .failOffsetY([-12, 12])
     .onStart(() => {
       scale.value = withTiming(1.035, { duration: 120 });
+      scheduleOnRN(setLocked, true);
     })
     .onUpdate((e) => {
       translateX.value = e.translationX;
@@ -69,7 +88,8 @@ export default function SwipeableGameCard({ children, onDismiss }) {
         // Let go decisively — carry it the rest of the way off screen in
         // the same direction it was already moving, fade it out, then
         // collapse the gap, then (and only then) tell the caller it's
-        // really gone.
+        // really gone. Deliberately NOT unlocking here — the row is on its
+        // way out either way, so there's nothing left to accidentally tap.
         const direction = e.translationX >= 0 ? 1 : -1;
         translateX.value = withTiming(direction * SCREEN_WIDTH * 1.2, {
           duration: 220,
@@ -83,9 +103,11 @@ export default function SwipeableGameCard({ children, onDismiss }) {
           }
         });
       } else {
-        // Didn't travel far/fast enough to count — spring back into place.
+        // Didn't travel far/fast enough to count — spring back into place,
+        // and re-enable the card's own tap now that this wasn't a dismiss.
         translateX.value = withSpring(0, { damping: 18, stiffness: 190 });
         scale.value = withTiming(1, { duration: 160 });
+        scheduleOnRN(setLocked, false);
       }
     });
 
@@ -120,7 +142,9 @@ export default function SwipeableGameCard({ children, onDismiss }) {
       }}
     >
       <GestureDetector gesture={pan}>
-        <Animated.View style={[styles.shadow, rowStyle]}>{children}</Animated.View>
+        <Animated.View style={[styles.shadow, rowStyle]} pointerEvents={locked ? 'none' : 'auto'}>
+          {children}
+        </Animated.View>
       </GestureDetector>
     </Animated.View>
   );
