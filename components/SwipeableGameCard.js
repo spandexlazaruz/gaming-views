@@ -10,6 +10,7 @@ import Animated, {
   Easing,
 } from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets';
+import { markRecentlySwiped } from '../lib/recentSwipes';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 // How far (fraction of screen width) or how fast a swipe has to travel
@@ -41,7 +42,12 @@ const DISMISS_VELOCITY = 800;
 // Expo SDK 54 actually bundles, not just "latest") and the New Architecture
 // note (Reanimated 4 requires it; app.json now sets newArchEnabled
 // explicitly rather than relying on an assumed default).
-export default function SwipeableGameCard({ children, onDismiss }) {
+// `swipeKey` — the same identifier the caller passes to `onDismiss`'s own
+// closure (a game title, in practice) — is used only for the round-2 phantom
+// -tap fix below (see the big comment on `locked`/`markRecentlySwiped`). It's
+// optional and does nothing on its own if omitted; GameCard.js's onPress
+// guard is the other required half.
+export default function SwipeableGameCard({ children, onDismiss, swipeKey }) {
   const translateX = useSharedValue(0);
   const scale = useSharedValue(1);
   const opacity = useSharedValue(1);
@@ -49,23 +55,30 @@ export default function SwipeableGameCard({ children, onDismiss }) {
   // first onLayout), so the collapse-after-dismiss animation has a real
   // number to animate down to 0 from — you can't animate to/from "auto".
   const height = useSharedValue(null);
-  // ADDED 2026-08-20 (bug fix): React Native's core Pressable (used by
-  // GameCard, the child this wraps) runs on RN's own legacy touch-responder
-  // system, not react-native-gesture-handler's gesture engine — the two
-  // don't automatically negotiate who "wins" a touch. Reported symptom: a
-  // real swipe-to-remove correctly plays the whole dismiss animation AND
-  // separately completes as a tap on the card underneath, navigating into
-  // that game's now-removed detail page right as it disappears. Rather than
-  // fight gesture-arbitration internals (version/platform-fragile), this
-  // just disables the child's touch responder outright — via pointerEvents
-  // — the moment the pan gesture actually activates (see .onStart below,
-  // which for a Pan with activeOffsetX only fires once that threshold is
-  // crossed, i.e. once it's a real swipe and not a tap), so there's no
-  // native touch left for GameCard's Pressable to complete a press with,
-  // regardless of how the gesture ends. Reset on spring-back (not a real
-  // swipe) so ordinary taps keep working the moment the finger lifts off an
-  // aborted/too-small drag.
+  // ADDED 2026-08-20 (bug fix, round 1): React Native's core Pressable (used
+  // by GameCard, the child this wraps) runs on RN's own legacy
+  // touch-responder system, not react-native-gesture-handler's gesture
+  // engine — the two don't automatically negotiate who "wins" a touch.
+  // `locked` disables the child's touch responder via pointerEvents the
+  // moment the pan gesture actually activates (see .onStart below). Kept in
+  // place since it's harmless and may still help on some platforms/OS
+  // versions, but confirmed on-device (2026-08-20) NOT to reliably prevent
+  // the underlying phantom tap on its own — see round 2 immediately below,
+  // which is the fix that actually closes this.
   const [locked, setLocked] = useState(false);
+  // ADDED 2026-08-20 (bug fix, round 2 — the one that actually works):
+  // pointerEvents changes native hit-testing, but by the time a real swipe
+  // has gone on for a while, react-native-gesture-handler's native Pan
+  // recognizer has likely already taken over the touch stream at the OS
+  // level — meaning RN's own Pressability may never see the intermediate
+  // touch-move events that would normally make it cancel the press on its
+  // own, and a JS-side prop change during the gesture can't retroactively
+  // undo that. So instead of trying to win that native-arbitration fight,
+  // `markRecentlySwiped` (lib/recentSwipes.js) flags this row's key the
+  // moment the swipe is recognized — well before the finger actually lifts
+  // — and GameCard's own onPress checks that flag synchronously and no-ops
+  // if it's set, regardless of why/how the native side decided to fire
+  // onPress at all.
 
   const pan = Gesture.Pan()
     // Only "claims" the gesture once the finger has actually moved mostly
@@ -76,6 +89,7 @@ export default function SwipeableGameCard({ children, onDismiss }) {
     .onStart(() => {
       scale.value = withTiming(1.035, { duration: 120 });
       scheduleOnRN(setLocked, true);
+      scheduleOnRN(markRecentlySwiped, swipeKey);
     })
     .onUpdate((e) => {
       translateX.value = e.translationX;

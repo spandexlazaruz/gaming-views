@@ -91,7 +91,7 @@ export default function WatchlistScreen() {
             // itself removes the card (no confirm step), see
             // SwipeableGameCard for the gesture/animation and the Undo
             // toast below for the accidental-swipe safety net.
-            <SwipeableGameCard onDismiss={() => handleSwipeRemove(item.title)}>
+            <SwipeableGameCard onDismiss={() => handleSwipeRemove(item.title)} swipeKey={item.title}>
               {/* multiPlatformBadges: shows every platform this title is
                   actually saved under (e.g. wishlisted on PS5 and Xbox
                   separately shows both badges on the one card) instead of a

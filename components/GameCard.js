@@ -5,6 +5,7 @@ import { useRouter } from 'expo-router';
 import { colors, PLATFORMS, posterThemes, hashStr } from '../lib/theme';
 import { daysUntil, formatDateShort, platformDateGroups } from '../lib/dates';
 import { useWatchlist, LEAD_OPTIONS } from '../lib/WatchlistContext';
+import { wasRecentlySwiped } from '../lib/recentSwipes';
 
 // `multiPlatformBadges` — when true (only passed from the Watchlist/Search
 // screens), shows every platform this specific title is actually saved
@@ -73,20 +74,33 @@ export default function GameCard({ game, highlightPlatform, showReminder, multiP
   return (
     <Pressable
       style={styles.card}
-      onPress={() => router.push(
-        // Carry the active platform filter (if any) through to the detail
-        // screen as a query param, so its own ADD TO WATCHLIST button can
-        // record the same platform GameCard's own heart toggle already does
-        // (see toggleWatchlist(title, platform) calls below). Without this,
-        // tapping into a game from e.g. a PS5-filtered list and adding it
-        // from the detail page instead of the card's heart icon silently
-        // fell back to the game's first-listed platform on Watchlist/Search
-        // — same root cause as fix log item 4, this closes the one path
-        // that fix didn't originally cover.
-        highlightPlatform
-          ? `/game/${encodeURIComponent(game.title)}?platform=${highlightPlatform}`
-          : `/game/${encodeURIComponent(game.title)}`
-      )}
+      onPress={() => {
+        // ADDED 2026-08-20 (bug fix, round 2): a card just swiped away by
+        // SwipeableGameCard (Watchlist tab) can still fire this onPress as a
+        // phantom tap — a known cross-system quirk between RN's core
+        // Pressable and react-native-gesture-handler's Pan, confirmed
+        // on-device to happen intermittently rather than every swipe (a
+        // timing race, not a deterministic bug). See lib/recentSwipes.js and
+        // SwipeableGameCard.js for the full explanation. This is a plain
+        // synchronous check, so it doesn't matter why the native side
+        // decided to fire onPress at all — if this title was just swiped,
+        // ignore it.
+        if (wasRecentlySwiped(game.title)) return;
+        router.push(
+          // Carry the active platform filter (if any) through to the detail
+          // screen as a query param, so its own ADD TO WATCHLIST button can
+          // record the same platform GameCard's own heart toggle already does
+          // (see toggleWatchlist(title, platform) calls below). Without this,
+          // tapping into a game from e.g. a PS5-filtered list and adding it
+          // from the detail page instead of the card's heart icon silently
+          // fell back to the game's first-listed platform on Watchlist/Search
+          // — same root cause as fix log item 4, this closes the one path
+          // that fix didn't originally cover.
+          highlightPlatform
+            ? `/game/${encodeURIComponent(game.title)}?platform=${highlightPlatform}`
+            : `/game/${encodeURIComponent(game.title)}`
+        );
+      }}
     >
       {game.coverUrl ? (
         <View style={styles.thumb}>
@@ -112,7 +126,7 @@ export default function GameCard({ game, highlightPlatform, showReminder, multiP
           <View style={styles.platTagRow}>
             {badgePlatforms.map((p) => (
               <View key={p} style={[styles.platTag, { backgroundColor: PLATFORMS[p].color }]}>
-                <Text style={styles.platTagText}>{PLATFORMS[p].label}</Text>
+                <Text style={[styles.platTagText, { color: PLATFORMS[p].textColor }]}>{PLATFORMS[p].label}</Text>
               </View>
             ))}
           </View>
@@ -135,7 +149,7 @@ export default function GameCard({ game, highlightPlatform, showReminder, multiP
           <View style={styles.platTagRow}>
             {badgePlatforms.map((p) => (
               <View key={p} style={[styles.platTag, { backgroundColor: PLATFORMS[p].color }]}>
-                <Text style={styles.platTagText}>{PLATFORMS[p].label}</Text>
+                <Text style={[styles.platTagText, { color: PLATFORMS[p].textColor }]}>{PLATFORMS[p].label}</Text>
               </View>
             ))}
           </View>
@@ -163,9 +177,18 @@ export default function GameCard({ game, highlightPlatform, showReminder, multiP
             <Text style={styles.date}>{formatDateShort(displayDate)}</Text>
           )}
           <Text style={styles.sep}>·</Text>
-          <View style={styles.platDots}>
+          {/* ADDED 2026-08-19: swapped the plain colored dots for small text
+              badges (same idea as the corner platTag, just smaller), per
+              Dan's request after reviewing mocked-up alternatives — reads as
+              "PS5 / XBOX / PC" at a glance instead of relying on a color
+              legend nobody's told about. Same dotPlatforms logic feeding it
+              as before (see the comment above dotPlatforms' definition) —
+              only the rendering changed, not which platforms show here. */}
+          <View style={styles.platIndicators}>
             {dotPlatforms.map((p) => (
-              <View key={p} style={[styles.dot, { backgroundColor: PLATFORMS[p].color }]} />
+              <View key={p} style={[styles.miniBadge, { backgroundColor: PLATFORMS[p].color }]}>
+                <Text style={[styles.miniBadgeText, { color: PLATFORMS[p].textColor }]}>{PLATFORMS[p].label}</Text>
+              </View>
             ))}
           </View>
           {badgeText && (
@@ -238,8 +261,15 @@ const styles = StyleSheet.create({
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
   date: { fontSize: 13, color: colors.muted, fontFamily: 'Inter_500Medium' },
   sep: { color: colors.mutedDim, fontSize: 12 },
-  platDots: { flexDirection: 'row', gap: 5 },
-  dot: { width: 8, height: 8, borderRadius: 4 },
+  // ADDED 2026-08-19: replaced platDots/dot (plain colored circles) with
+  // mini text badges — see the comment at the call site above. Sizing kept
+  // deliberately compact (8px font, tight padding) since this sits inline
+  // with the date on a card that's already fairly dense; still noticeably
+  // wider than the old dots, so a title with a long name and 3-4 platforms
+  // can wrap this row onto its own line (metaRow already has flexWrap set).
+  platIndicators: { flexDirection: 'row', gap: 4, flexWrap: 'wrap' },
+  miniBadge: { borderRadius: 4, paddingHorizontal: 5, paddingVertical: 1.5 },
+  miniBadgeText: { fontSize: 8, fontFamily: 'Inter_600SemiBold', letterSpacing: 0.2, textTransform: 'uppercase' },
   badgeSoon: { backgroundColor: colors.orangeDim, borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2.5 },
   badgeSoonText: { fontSize: 11, fontFamily: 'Inter_600SemiBold', color: colors.orange },
   reminderRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 2 },
