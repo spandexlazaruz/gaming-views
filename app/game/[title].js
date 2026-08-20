@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { View, Text, ScrollView, Pressable, Image, StyleSheet, Modal, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { WebView } from 'react-native-webview';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { colors, PLATFORMS, posterThemes, hashStr } from '../../lib/theme';
@@ -25,8 +26,29 @@ export default function GameDetailScreen() {
   const { saved, savedPlatforms, toggleWatchlist, reminders, setReminderLead } = useWatchlist();
   const [storePickerOpen, setStorePickerOpen] = useState(false);
   const [storeChecking, setStoreChecking] = useState(false);
+  // ADDED 2026-08-20 (game detail page enrichment — description/trailer/
+  // screenshots, layout locked 2026-08-20): descExpanded/descTruncatable
+  // drive the description's "Show more/less" toggle — descTruncatable only
+  // flips true if the real text actually overflows the collapsed clamp (see
+  // the description Text's onTextLayout below), so the toggle never shows
+  // for a game whose description already fits. trailerPlaying swaps the
+  // trailer thumbnail for a real embedded YouTube player on tap (Dan's
+  // explicit choice over an outbound link — see roadmap Phase 7 for the
+  // tradeoff that was presented). All three reset when navigating between
+  // different games' detail pages, below, since expo-router can reuse this
+  // screen's component instance across a title param change rather than
+  // remounting it.
+  const [descExpanded, setDescExpanded] = useState(false);
+  const [descTruncatable, setDescTruncatable] = useState(false);
+  const [trailerPlaying, setTrailerPlaying] = useState(false);
 
   const game = games.find((g) => g.title === decodeURIComponent(title));
+
+  useEffect(() => {
+    setDescExpanded(false);
+    setDescTruncatable(false);
+    setTrailerPlaying(false);
+  }, [title]);
 
   const FixedHeader = (
     <View style={styles.headerBar}>
@@ -247,13 +269,91 @@ export default function GameDetailScreen() {
             </View>
           )}
 
+          {/* ADDED/CHANGED 2026-08-20 (game detail page enrichment, layout
+              locked 2026-08-20): description → trailer → screenshots, in
+              that order, per the approved HTML prototype. Description itself
+              is the same section as before, now showing the backend's full
+              untruncated summary (the old 220-char DESC_LIMIT is gone — see
+              gaming-views-backend/api/games.js) behind a "Show more/less"
+              clamp instead. */}
           <View style={styles.section}>
             <Text style={styles.sectionHead}>ABOUT THIS RELEASE</Text>
-            <Text style={styles.blurb}>{blurb}</Text>
+            <Text
+              style={styles.blurb}
+              numberOfLines={descExpanded ? undefined : 4}
+              onTextLayout={(e) => {
+                // Only ever flips true — once a description is confirmed to
+                // overflow 4 lines while collapsed, that's true regardless of
+                // anything that fires after (e.g. a stray re-layout).
+                if (!descExpanded && e.nativeEvent.lines.length > 4) setDescTruncatable(true);
+              }}
+            >
+              {blurb}
+            </Text>
+            {descTruncatable && (
+              <Pressable onPress={() => setDescExpanded((v) => !v)} hitSlop={6}>
+                <Text style={styles.showMoreText}>{descExpanded ? 'Show less' : 'Show more'}</Text>
+              </Pressable>
+            )}
             {!isSaved && (
               <Text style={styles.blurbCta}>Add it to your watchlist and we'll keep it front and center as the date gets closer.</Text>
             )}
           </View>
+
+          {/* Hidden entirely when a game has no video data — common for
+              smaller titles, same "don't show what you don't have" pattern
+              already used for coverUrl/steam elsewhere on this screen. */}
+          {game.videoId && (
+            <View style={styles.section}>
+              <Text style={styles.sectionHead}>TRAILER</Text>
+              <View style={styles.trailerBox}>
+                {trailerPlaying ? (
+                  // No Pressable wrapper here on purpose — once the embed is
+                  // live, touches need to reach YouTube's own player controls
+                  // (play/pause, scrub, fullscreen), not get intercepted by
+                  // this screen.
+                  <WebView
+                    style={StyleSheet.absoluteFill}
+                    originWhitelist={['*']}
+                    source={{ uri: `https://www.youtube.com/embed/${game.videoId}?autoplay=1&playsinline=1&rel=0` }}
+                    allowsInlineMediaPlayback
+                    mediaPlaybackRequiresUserAction={false}
+                  />
+                ) : (
+                  <Pressable style={StyleSheet.absoluteFill} onPress={() => setTrailerPlaying(true)}>
+                    {/* img.youtube.com's thumbnail endpoint needs no API key
+                        and matches the same video_id IGDB gave us — standard,
+                        reliable approach, not a scrape. */}
+                    <Image
+                      source={{ uri: `https://img.youtube.com/vi/${game.videoId}/hqdefault.jpg` }}
+                      style={StyleSheet.absoluteFill}
+                      resizeMode="cover"
+                    />
+                    <View style={styles.trailerPlayOverlay}>
+                      <View style={styles.trailerPlayBtn}>
+                        <Text style={styles.trailerPlayIcon}>▶</Text>
+                      </View>
+                    </View>
+                  </Pressable>
+                )}
+              </View>
+            </View>
+          )}
+
+          {game.screenshots && game.screenshots.length > 0 && (
+            <View style={styles.section}>
+              <Text style={styles.sectionHead}>SCREENSHOTS</Text>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.screenshotsRow}
+              >
+                {game.screenshots.map((url, i) => (
+                  <Image key={url || i} source={{ uri: url }} style={styles.screenshotThumb} resizeMode="cover" />
+                ))}
+              </ScrollView>
+            </View>
+          )}
 
           {others.length > 0 && (
             <View style={styles.section}>
@@ -384,7 +484,27 @@ const styles = StyleSheet.create({
   section: { marginBottom: 22 },
   sectionHead: { fontSize: 11.5, fontFamily: 'Inter_600SemiBold', color: colors.mutedDim, letterSpacing: 1, marginBottom: 10 },
   blurb: { fontSize: 13.5, color: colors.muted, lineHeight: 21, fontFamily: 'Inter_400Regular' },
+  showMoreText: { fontSize: 12.5, color: colors.orange, fontFamily: 'Inter_600SemiBold', marginTop: 6 },
   blurbCta: { fontSize: 12, color: colors.mutedDim, lineHeight: 18, fontFamily: 'Inter_500Medium', fontStyle: 'italic', marginTop: 8 },
+  trailerBox: {
+    width: '100%', aspectRatio: 16 / 9, borderRadius: 12, overflow: 'hidden',
+    backgroundColor: colors.bgCard, borderWidth: 1, borderColor: colors.line,
+  },
+  trailerPlayOverlay: {
+    ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.25)',
+  },
+  trailerPlayBtn: {
+    width: 54, height: 54, borderRadius: 27, backgroundColor: 'rgba(10,12,16,0.75)',
+    borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.3)',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  trailerPlayIcon: { color: colors.white, fontSize: 20, marginLeft: 3 },
+  screenshotsRow: { gap: 10, paddingRight: 4 },
+  screenshotThumb: {
+    width: 220, height: 124, borderRadius: 10, backgroundColor: colors.bgCard,
+    borderWidth: 1, borderColor: colors.line,
+  },
   steamCard: {
     backgroundColor: colors.bgCard, borderWidth: 1, borderColor: colors.line,
     borderRadius: 12, padding: 14, flexDirection: 'row', alignItems: 'center',
