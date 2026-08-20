@@ -3,6 +3,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useFonts, Poppins_600SemiBold, Poppins_700Bold, Poppins_800ExtraBold } from '@expo-google-fonts/poppins';
 import { Inter_400Regular, Inter_500Medium, Inter_600SemiBold } from '@expo-google-fonts/inter';
 import { View, ActivityIndicator } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { WatchlistProvider } from '../lib/WatchlistContext';
@@ -58,29 +59,35 @@ export default Sentry.wrap(function RootLayout() {
     })();
   }, [fontsLoaded]);
 
-  if (!fontsLoaded) {
-    return (
-      <View style={{ flex: 1, backgroundColor: colors.bgPage, alignItems: 'center', justifyContent: 'center' }}>
-        <ActivityIndicator color={colors.orange} />
-      </View>
-    );
-  }
-
+  // ADDED 2026-08-20: GestureHandlerRootView now wraps the whole app —
+  // required by react-native-gesture-handler (added for the Watchlist tab's
+  // swipe-to-remove) so its gestures actually register correctly rather
+  // than intermittently failing. Wraps both the loading state and the real
+  // app below rather than being nested only under one branch, so it's in
+  // place before any screen that might use gestures ever mounts.
   return (
-    <GamesProvider>
-      <WatchlistProvider>
-        <StatusBar style="light" />
-        <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bgPage } }}>
-          <Stack.Screen name="(tabs)" />
-          <Stack.Screen name="onboarding" options={{ presentation: 'fullScreenModal' }} />
-          <Stack.Screen name="game/[title]" options={{ presentation: 'modal' }} />
-          <Stack.Screen name="search" options={{ presentation: 'modal' }} />
-          <Stack.Screen name="menu" options={{ presentation: 'modal' }} />
-          <Stack.Screen name="accounts" options={{ presentation: 'modal' }} />
-          <Stack.Screen name="settings" options={{ presentation: 'modal' }} />
-          <Stack.Screen name="notifications" options={{ presentation: 'modal' }} />
-        </Stack>
-      </WatchlistProvider>
-    </GamesProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      {!fontsLoaded ? (
+        <View style={{ flex: 1, backgroundColor: colors.bgPage, alignItems: 'center', justifyContent: 'center' }}>
+          <ActivityIndicator color={colors.orange} />
+        </View>
+      ) : (
+        <GamesProvider>
+          <WatchlistProvider>
+            <StatusBar style="light" />
+            <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bgPage } }}>
+              <Stack.Screen name="(tabs)" />
+              <Stack.Screen name="onboarding" options={{ presentation: 'fullScreenModal' }} />
+              <Stack.Screen name="game/[title]" options={{ presentation: 'modal' }} />
+              <Stack.Screen name="search" options={{ presentation: 'modal' }} />
+              <Stack.Screen name="menu" options={{ presentation: 'modal' }} />
+              <Stack.Screen name="accounts" options={{ presentation: 'modal' }} />
+              <Stack.Screen name="settings" options={{ presentation: 'modal' }} />
+              <Stack.Screen name="notifications" options={{ presentation: 'modal' }} />
+            </Stack>
+          </WatchlistProvider>
+        </GamesProvider>
+      )}
+    </GestureHandlerRootView>
   );
 });
