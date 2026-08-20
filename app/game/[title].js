@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { View, Text, ScrollView, Pressable, Image, StyleSheet, Modal, Linking } from 'react-native';
+import { View, Text, ScrollView, Pressable, Image, StyleSheet, Modal, Linking, Dimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -13,6 +13,55 @@ import { useWatchlist, LEAD_OPTIONS } from '../../lib/WatchlistContext';
 import { ensureNotificationPermission } from '../../lib/notifications';
 import GameCard from '../../components/GameCard';
 import QuickNavBar from '../../components/QuickNavBar';
+
+// ADDED 2026-08-20 (fix, game detail page enrichment — item 26): the trailer
+// embed's very first on-device test failed with YouTube's "Video player
+// configuration error" (Error 153) — researched rather than guessed, since
+// this is a well-documented WebView-specific failure mode, not a bad
+// video_id. Root cause: navigating a WebView directly to a
+// youtube.com/embed URL via `source={{ uri }}` is a cross-origin top-level
+// load, and WebViews (WKWebView on iOS especially) commonly don't send a
+// Referer header on that kind of request — YouTube's embed player checks
+// for a valid referrer/origin and refuses to play without one, confirmed
+// against multiple independent sources describing this exact symptom in
+// react-native-webview specifically (not just "YouTube being flaky").
+// Fix: load a tiny local HTML document instead, with the real embed URL
+// inside an <iframe>, via `source={{ html, baseUrl }}` — setting `baseUrl`
+// to a genuine https://www.youtube.com origin gives the iframe's own
+// request a legitimate referrer to send, which is what YouTube's check is
+// actually looking for. No proxy service, no new backend endpoint — both
+// were real options surfaced by the research but heavier than needed here.
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+
+// ADDED 2026-08-20 (fix, game detail page enrichment — item 26, screenshots
+// half): the thumbnail row deliberately uses the smaller t_screenshot_big
+// template (see gaming-views-backend/api/games.js) to keep the row itself
+// light — but that's the wrong size to actually view large in the full-
+// screen viewer below. Same string-replace-a-size-template convention
+// already used by the backend's toCoverUrl (t_thumb → t_1080p) — no new
+// backend call needed, just asking IGDB's existing CDN for a bigger version
+// of the same image_id.
+function toLargeScreenshotUrl(url) {
+  return url.replace('t_screenshot_big', 't_1080p');
+}
+
+function youtubeEmbedHtml(videoId) {
+  return `<!DOCTYPE html>
+<html>
+  <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <style>html,body{margin:0;padding:0;background:#000;height:100%;overflow:hidden;}iframe{position:absolute;top:0;left:0;width:100%;height:100%;border:0;}</style>
+  </head>
+  <body>
+    <iframe
+      src="https://www.youtube.com/embed/${videoId}?autoplay=1&playsinline=1&rel=0"
+      frameborder="0"
+      allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture"
+      allowfullscreen
+    ></iframe>
+  </body>
+</html>`;
+}
 
 export default function GameDetailScreen() {
   const { title, platform } = useLocalSearchParams();
@@ -29,25 +78,43 @@ export default function GameDetailScreen() {
   // ADDED 2026-08-20 (game detail page enrichment — description/trailer/
   // screenshots, layout locked 2026-08-20): descExpanded/descTruncatable
   // drive the description's "Show more/less" toggle — descTruncatable only
-  // flips true if the real text actually overflows the collapsed clamp (see
-  // the description Text's onTextLayout below), so the toggle never shows
-  // for a game whose description already fits. trailerPlaying swaps the
-  // trailer thumbnail for a real embedded YouTube player on tap (Dan's
-  // explicit choice over an outbound link — see roadmap Phase 7 for the
-  // tradeoff that was presented). All three reset when navigating between
-  // different games' detail pages, below, since expo-router can reuse this
-  // screen's component instance across a title param change rather than
-  // remounting it.
+  // flips true if the real text actually overflows the collapsed clamp.
+  // FIXED 2026-08-20 (later): the toggle never appeared on-device at all —
+  // researched rather than guessed, since this is a documented cross-
+  // platform inconsistency (facebook/react-native#36572/#36675), not a
+  // one-off. The original approach measured truncation via onTextLayout on
+  // the SAME Text that already had numberOfLines={4} applied from its very
+  // first render — on iOS specifically, onTextLayout on an already-clamped
+  // Text reports only the rendered (i.e. already-clamped-to-4) line count,
+  // never the true full count, so `lines.length > 4` could never be true.
+  // Fixed by decoupling measurement from display: a second, invisible
+  // "measurer" Text below (same content/style, no numberOfLines) reports the
+  // real full line count via its own onTextLayout, and that's what
+  // descTruncatable is set from — the visible Text's numberOfLines is never
+  // involved in the measurement at all. descMeasured guards against
+  // re-measuring after the first pass (the measurer's content doesn't
+  // change once mounted for a given game). trailerPlaying swaps the trailer
+  // thumbnail for a real embedded YouTube player on tap (Dan's explicit
+  // choice over an outbound link — see roadmap Phase 7). screenshotViewerIndex
+  // opens the full-screen screenshot viewer (added 2026-08-20, later — see
+  // below) at a given index, or stays null when closed. All reset when
+  // navigating between different games' detail pages, below, since
+  // expo-router can reuse this screen's component instance across a title
+  // param change rather than remounting it.
   const [descExpanded, setDescExpanded] = useState(false);
   const [descTruncatable, setDescTruncatable] = useState(false);
+  const [descMeasured, setDescMeasured] = useState(false);
   const [trailerPlaying, setTrailerPlaying] = useState(false);
+  const [screenshotViewerIndex, setScreenshotViewerIndex] = useState(null);
 
   const game = games.find((g) => g.title === decodeURIComponent(title));
 
   useEffect(() => {
     setDescExpanded(false);
     setDescTruncatable(false);
+    setDescMeasured(false);
     setTrailerPlaying(false);
+    setScreenshotViewerIndex(null);
   }, [title]);
 
   const FixedHeader = (
@@ -278,18 +345,30 @@ export default function GameDetailScreen() {
               clamp instead. */}
           <View style={styles.section}>
             <Text style={styles.sectionHead}>ABOUT THIS RELEASE</Text>
-            <Text
-              style={styles.blurb}
-              numberOfLines={descExpanded ? undefined : 4}
-              onTextLayout={(e) => {
-                // Only ever flips true — once a description is confirmed to
-                // overflow 4 lines while collapsed, that's true regardless of
-                // anything that fires after (e.g. a stray re-layout).
-                if (!descExpanded && e.nativeEvent.lines.length > 4) setDescTruncatable(true);
-              }}
-            >
-              {blurb}
-            </Text>
+            {/* blurbWrap gives the measurer below something to be absolutely
+                positioned inside that's just the description itself — not
+                the section header above it too. See the descTruncatable
+                comment above for why the measurer exists as its own Text
+                rather than reading onTextLayout off the visible (clamped)
+                one; it takes no extra layout space and is never seen or
+                touchable. */}
+            <View style={styles.blurbWrap}>
+              {!descMeasured && (
+                <Text
+                  style={[styles.blurb, styles.blurbMeasure]}
+                  pointerEvents="none"
+                  onTextLayout={(e) => {
+                    setDescTruncatable(e.nativeEvent.lines.length > 4);
+                    setDescMeasured(true);
+                  }}
+                >
+                  {blurb}
+                </Text>
+              )}
+              <Text style={styles.blurb} numberOfLines={descExpanded ? undefined : 4}>
+                {blurb}
+              </Text>
+            </View>
             {descTruncatable && (
               <Pressable onPress={() => setDescExpanded((v) => !v)} hitSlop={6}>
                 <Text style={styles.showMoreText}>{descExpanded ? 'Show less' : 'Show more'}</Text>
@@ -315,7 +394,7 @@ export default function GameDetailScreen() {
                   <WebView
                     style={StyleSheet.absoluteFill}
                     originWhitelist={['*']}
-                    source={{ uri: `https://www.youtube.com/embed/${game.videoId}?autoplay=1&playsinline=1&rel=0` }}
+                    source={{ html: youtubeEmbedHtml(game.videoId), baseUrl: 'https://www.youtube.com' }}
                     allowsInlineMediaPlayback
                     mediaPlaybackRequiresUserAction={false}
                   />
@@ -348,8 +427,13 @@ export default function GameDetailScreen() {
                 showsHorizontalScrollIndicator={false}
                 contentContainerStyle={styles.screenshotsRow}
               >
+                {/* ADDED 2026-08-20 (fix): thumbnails weren't tappable at
+                    all — see the full-screen viewer Modal below, which opens
+                    to this exact index and swipes through the rest. */}
                 {game.screenshots.map((url, i) => (
-                  <Image key={url || i} source={{ uri: url }} style={styles.screenshotThumb} resizeMode="cover" />
+                  <Pressable key={url || i} onPress={() => setScreenshotViewerIndex(i)}>
+                    <Image source={{ uri: url }} style={styles.screenshotThumb} resizeMode="cover" />
+                  </Pressable>
                 ))}
               </ScrollView>
             </View>
@@ -389,6 +473,60 @@ export default function GameDetailScreen() {
             </Pressable>
           </View>
         </Pressable>
+      </Modal>
+
+      {/* ADDED 2026-08-20 (fix): full-screen screenshot viewer — thumbnails
+          in the gallery row above weren't clickable to view larger at all.
+          Opens to the tapped index and pages horizontally through the rest,
+          same "swipe through a gallery" pattern as most photo viewers.
+          Renders a bigger version of the same image_id (see
+          toLargeScreenshotUrl above), not the thumbnail-sized one used in
+          the row, since that's genuinely too small to view enlarged. */}
+      <Modal
+        visible={screenshotViewerIndex !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setScreenshotViewerIndex(null)}
+      >
+        <View style={styles.screenshotViewerBackdrop}>
+          <Pressable
+            style={styles.screenshotViewerClose}
+            onPress={() => setScreenshotViewerIndex(null)}
+            hitSlop={10}
+          >
+            <Text style={styles.screenshotViewerCloseText}>✕</Text>
+          </Pressable>
+          {screenshotViewerIndex !== null && game.screenshots && (
+            <>
+              <ScrollView
+                style={styles.screenshotViewerScroll}
+                horizontal
+                pagingEnabled
+                showsHorizontalScrollIndicator={false}
+                contentOffset={{ x: screenshotViewerIndex * SCREEN_WIDTH, y: 0 }}
+                onMomentumScrollEnd={(e) => {
+                  const i = Math.round(e.nativeEvent.contentOffset.x / SCREEN_WIDTH);
+                  setScreenshotViewerIndex(i);
+                }}
+              >
+                {game.screenshots.map((url, i) => (
+                  <View key={url || i} style={styles.screenshotViewerPage}>
+                    <Image
+                      source={{ uri: toLargeScreenshotUrl(url) }}
+                      style={styles.screenshotViewerImage}
+                      resizeMode="contain"
+                    />
+                  </View>
+                ))}
+              </ScrollView>
+              {game.screenshots.length > 1 && (
+                <Text style={styles.screenshotViewerCounter}>
+                  {screenshotViewerIndex + 1} / {game.screenshots.length}
+                </Text>
+              )}
+            </>
+          )}
+        </View>
       </Modal>
 
       <QuickNavBar />
@@ -484,6 +622,11 @@ const styles = StyleSheet.create({
   section: { marginBottom: 22 },
   sectionHead: { fontSize: 11.5, fontFamily: 'Inter_600SemiBold', color: colors.mutedDim, letterSpacing: 1, marginBottom: 10 },
   blurb: { fontSize: 13.5, color: colors.muted, lineHeight: 21, fontFamily: 'Inter_400Regular' },
+  blurbWrap: { position: 'relative' },
+  // Invisible measurer, absolutely positioned over the real (visible) blurb
+  // Text within the same blurbWrap — zero added layout height, never seen or
+  // touchable. See the descTruncatable comment above.
+  blurbMeasure: { position: 'absolute', top: 0, left: 0, right: 0, opacity: 0 },
   showMoreText: { fontSize: 12.5, color: colors.orange, fontFamily: 'Inter_600SemiBold', marginTop: 6 },
   blurbCta: { fontSize: 12, color: colors.mutedDim, lineHeight: 18, fontFamily: 'Inter_500Medium', fontStyle: 'italic', marginTop: 8 },
   trailerBox: {
@@ -504,6 +647,25 @@ const styles = StyleSheet.create({
   screenshotThumb: {
     width: 220, height: 124, borderRadius: 10, backgroundColor: colors.bgCard,
     borderWidth: 1, borderColor: colors.line,
+  },
+  screenshotViewerBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.92)', justifyContent: 'center' },
+  screenshotViewerClose: {
+    position: 'absolute', top: 50, right: 16, zIndex: 2,
+    width: 38, height: 38, borderRadius: 19, backgroundColor: 'rgba(28,33,41,0.85)',
+    borderWidth: 1, borderColor: colors.line, alignItems: 'center', justifyContent: 'center',
+  },
+  screenshotViewerCloseText: { color: colors.white, fontSize: 17 },
+  // Explicit flex:1 on the ScrollView itself — a horizontal ScrollView with
+  // no explicit height/flex collapses to zero, and each page/image below
+  // needs a real parent height to size against for resizeMode="contain" to
+  // do anything sensible.
+  screenshotViewerScroll: { flex: 1 },
+  screenshotViewerPage: { width: SCREEN_WIDTH, height: '100%', alignItems: 'center', justifyContent: 'center' },
+  screenshotViewerImage: { width: SCREEN_WIDTH, height: '100%' },
+  screenshotViewerCounter: {
+    position: 'absolute', bottom: 40, alignSelf: 'center',
+    color: colors.muted, fontSize: 12.5, fontFamily: 'Inter_600SemiBold',
+    backgroundColor: 'rgba(28,33,41,0.85)', borderRadius: 999, paddingHorizontal: 12, paddingVertical: 5,
   },
   steamCard: {
     backgroundColor: colors.bgCard, borderWidth: 1, borderColor: colors.line,
