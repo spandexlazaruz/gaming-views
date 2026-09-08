@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { View, Text, SectionList, ScrollView, Pressable, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { colors, PLATFORMS, GENRES } from '../../lib/theme';
@@ -58,39 +58,47 @@ export default function CalendarScreen() {
   const router = useRouter();
   const { games, loading, error, refetch } = useGames();
   const { saved, toggleWatchlist, preferredPlatform, preferredGenre, hydrated } = useWatchlist();
-  // FIXED 2026-09-08 (item 29): onboarding's platform/genre picks (see
-  // app/onboarding.js's finish(), which calls setPreferredPlatform/
-  // setPreferredGenre) genuinely were reaching WatchlistContext and being
-  // persisted — but this screen used to seed its own filter state with
-  // `useState(preferredPlatform)`/`useState(preferredGenre)`, which only
-  // ever captures a value ONCE, at this component's own first render.
-  // WatchlistContext's `preferredPlatform`/`preferredGenre` are themselves
-  // loaded from AsyncStorage asynchronously on app start (see the hydration
-  // effect in WatchlistContext.js) — on a normal app open this resolves
-  // long before the Calendar tab is ever visited, but there's no guarantee
-  // of that ordering (e.g. right after onboarding finishes and navigates
-  // straight here), and when it lost that race the seeded value was
-  // whatever the still-default 'all' happened to be — silently, with
-  // nothing to indicate a preference existed at all. That's exactly what
-  // read as "the onboarding filters don't actually do anything."
+  // FIXED 2026-09-08, revised 2026-09-08 (item 29): the previous attempt
+  // seeded activePlatform/activeGenre via an effect keyed only on
+  // `hydrated`, assuming this screen would either mount fresh after
+  // onboarding finishes, or still be unmounted when `hydrated` flips true.
+  // Neither holds: app/_layout.js's Stack always mounts `(tabs)` (and this
+  // screen) immediately on launch, and only redirects to `/onboarding`
+  // afterward once the `hasOnboarded` check resolves — so by the time
+  // onboarding calls setPreferredPlatform/setPreferredGenre and navigates
+  // back via router.replace('/(tabs)'), it's returning to this SAME
+  // already-mounted instance, not a fresh one. `hydrated` had already
+  // flipped true long before onboarding ever ran, so the old effect's only
+  // trigger never fired again — the onboarding pick was silently dropped
+  // every time, on both a genuine restart and the in-app preview flow.
   //
-  // Fixed by always starting on 'all' here and applying the real preference
-  // once, via an effect keyed on `hydrated` — that flag is guaranteed to be
-  // true by the time this effect can possibly matter (either hydration
-  // finished well before this screen mounted, the common case, or it flips
-  // true while this screen is already mounted and the effect re-fires) — so
-  // this can no longer lose the race regardless of exact mount timing.
-  // Deliberately a one-time seed, not continuous syncing: `hydrated` only
-  // transitions false→true once per app session, so a user's own chip taps
-  // afterward are never overwritten by this effect re-firing.
+  // Fixed by also depending on preferredPlatform/preferredGenre themselves,
+  // so a later change to either (onboarding finishing, while this screen
+  // was already sitting there) re-applies too — guarded so it never
+  // clobbers the user's own chip taps once they've made one.
+  //
+  // FIXED 2026-09-08 (later, same day): that guard used to be a single
+  // shared userTouchedFilters ref checked by both setState calls below —
+  // meaning a manual tap on EITHER chip disabled auto-seeding for BOTH
+  // dimensions for the rest of the session, not just the one actually
+  // touched. Concretely: onboarding sets only one of
+  // preferredPlatform/preferredGenre when the other was a multi-pick (see
+  // onboarding.js's finish() — no filter for 2+ selections, by design), so
+  // the seeding effect still needs to apply the OTHER, validly-single-picked
+  // one on its own — but if the Calendar's own platform or genre chip row
+  // got tapped at any point first (even just poking at the UI), the shared
+  // ref would silently block that still-pending, still-valid seed too,
+  // reading as if it had never worked. Split into two independent refs, one
+  // per dimension, so a manual override on one can never veto the other.
   const [activePlatform, setActivePlatform] = useState('all');
   const [activeGenre, setActiveGenre] = useState('all');
+  const userTouchedPlatform = useRef(false);
+  const userTouchedGenre = useRef(false);
   useEffect(() => {
     if (!hydrated) return;
-    setActivePlatform(preferredPlatform);
-    setActiveGenre(preferredGenre);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hydrated]);
+    if (!userTouchedPlatform.current) setActivePlatform(preferredPlatform);
+    if (!userTouchedGenre.current) setActiveGenre(preferredGenre);
+  }, [hydrated, preferredPlatform, preferredGenre]);
   // No "preferred month" concept, unlike platform/genre — the whole point of
   // this filter is a rolling window that shifts day to day, so there's
   // nothing sensible to persist as a default. Always starts on "All Months".
@@ -209,7 +217,7 @@ export default function CalendarScreen() {
         {platformChips.map((c) => (
           <Pressable
             key={c.key}
-            onPress={() => setActivePlatform(c.key)}
+            onPress={() => { userTouchedPlatform.current = true; setActivePlatform(c.key); }}
             style={[styles.chip, activePlatform === c.key && styles.chipActive]}
           >
             <Text style={[styles.chipText, activePlatform === c.key && styles.chipTextActive]}>{c.label}</Text>
@@ -221,7 +229,7 @@ export default function CalendarScreen() {
         {genreChips.map((c) => (
           <Pressable
             key={c.key}
-            onPress={() => setActiveGenre(c.key)}
+            onPress={() => { userTouchedGenre.current = true; setActiveGenre(c.key); }}
             style={[styles.genreChip, activeGenre === c.key && styles.genreChipActive]}
           >
             <Text style={[styles.genreChipText, activeGenre === c.key && styles.genreChipTextActive]}>{c.label}</Text>
