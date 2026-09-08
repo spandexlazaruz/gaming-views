@@ -67,40 +67,32 @@ function toLargeScreenshotUrl(url) {
 // MDN's docs) — removed it from the `allow` list below. Dan confirmed
 // on-device, 2026-08-21, that this did NOT fix it.
 //
-// FIXED FOR REAL 2026-09-08 (item 28): researched further after the first
-// attempt was confirmed not to work. The floating thumbnail is YouTube's own
-// in-page "miniplayer" UI — native player chrome rendered inside the iframe
-// itself, entirely unrelated to the browser-level PiP API the first attempt
-// targeted — and there's no documented parameter to disable the miniplayer
-// specifically (confirmed against YouTube's own Embedded Players and
-// Player Parameters docs, and the IFrame Player API reference — see the
-// sources on this in next-release-fix-log.md item 28). The only real way to
-// stop it: don't render YouTube's native control chrome at all.
-// `controls=0` does that — no play/pause, no seek bar, no fullscreen
-// button, no miniplayer tap zones — replaced here with a small custom
-// play/pause and fullscreen control pair, driven by the real YouTube IFrame
-// Player API (`enablejsapi` is implicit once the page loads
-// https://www.youtube.com/iframe_api and constructs a real `YT.Player`,
-// rather than a bare <iframe src=...> like before). Known trade-off, being
-// upfront about it: no scrub/seek bar in this pass — tap-to-play/pause and
-// tap-to-fullscreen only. A real scrub control is a reasonable follow-up if
-// it turns out to be missed, but needs its own drag-handling and on-device
-// testing pass, not just another parameter flip like this fix.
-// TEMPORARY DIAGNOSTIC (2026-09-08, item 28 continued): two prior fix
-// attempts (088af04a, then allowsPictureInPictureMediaPlayback in 189c7a92)
-// didn't resolve Dan's screen-recorded report that the fullscreen button
-// triggers a native iOS video handoff (washed-out transition, then a
-// separate Now Playing/Control Center session) instead of expanding
-// in-page. No Mac/Safari Web Inspector available to attach to the WKWebView
-// directly, so this posts real on-device signal back to RN instead: every
-// fullscreenchange/webkitfullscreenchange event on the outer document (the
-// one thing still reachable from here — the nested YouTube iframe's own
-// document is cross-origin and can't be inspected), plus whatever the
-// button's requestFullscreen()/webkitRequestFullscreen() call itself
-// actually does (resolves, rejects, or throws synchronously) — see the
-// onMessage handler on the <WebView> below, which logs it straight to this
-// Metro terminal. Strip this whole block back out once we have a real
-// answer; it has no purpose beyond that.
+// ATTEMPTED 2026-09-08 (item 28), reverted the same day: tried replacing
+// YouTube's native control chrome entirely with `controls=0` + a small
+// custom play/pause and fullscreen control pair, driven by the real YouTube
+// IFrame Player API. That didn't hold up under more testing: (1) the custom
+// fullscreen button never worked at all — an on-device diagnostic (posting
+// real events/errors back to RN via postMessage, since no Mac was available
+// for Safari Web Inspector) confirmed WKWebView never exposes
+// requestFullscreen()/webkitRequestFullscreen() on this element in the first
+// place, so that button's tap handler silently did nothing on every attempt,
+// including the very first one; (2) `controls=0` only stops YouTube from
+// *drawing* its own control-bar UI — it doesn't detach the underlying
+// player's own native tap/gesture handling from the rest of the video
+// surface, which is cross-origin content this app can't inspect or
+// override. The small custom buttons only covered a tiny hit area (52px/
+// 34px circles), leaving most of the video tappable straight through to
+// YouTube's own still-live native surface underneath — which is what was
+// actually producing the native iOS fullscreen/Now Playing handoff Dan kept
+// screen-recording, not this app's own (non-functional) fullscreen button.
+//
+// Given the replacement control scheme never functioned and couldn't fully
+// cover the native surface it was meant to replace anyway, reverted to
+// YouTube's own real native controls (`controls=1`, the default) rather
+// than keep patching a custom layer that was broken from its first attempt.
+// The original PiP complaint this section started with is handled at a
+// different, more effective layer regardless of which controls are drawn —
+// see allowsPictureInPictureMediaPlayback on the <WebView> below.
 function youtubeEmbedHtml(videoId) {
   return `<!DOCTYPE html>
 <html>
@@ -109,92 +101,24 @@ function youtubeEmbedHtml(videoId) {
     <style>
       html,body{margin:0;padding:0;background:#000;height:100%;overflow:hidden;}
       #player{position:absolute;top:0;left:0;width:100%;height:100%;}
-      .ctrl{
-        position:absolute; z-index:5; border:0; border-radius:999px;
-        background:rgba(10,12,16,0.6); color:#fff; display:flex;
-        align-items:center; justify-content:center; padding:0;
-      }
-      #playPause{ left:50%; top:50%; width:52px; height:52px; margin:-26px 0 0 -26px; font-size:19px; }
-      #fullscreen{ right:10px; bottom:10px; width:34px; height:34px; font-size:13px; }
     </style>
   </head>
   <body>
     <div id="player"></div>
-    <button id="playPause" class="ctrl">❚❚</button>
-    <button id="fullscreen" class="ctrl">⛶</button>
     <script>
-      // TEMPORARY DIAGNOSTIC — see comment above youtubeEmbedHtml() in
-      // app/game/[title].js. Remove this whole block, and the two
-      // fullscreenchange/webkitfullscreenchange listeners below, once we
-      // have a real answer.
-      function diag(label, extra) {
-        try {
-          if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
-            window.ReactNativeWebView.postMessage(JSON.stringify({
-              tag: 'trailer-fs-diag', label: label, extra: extra || null, ts: Date.now()
-            }));
-          }
-        } catch (e) {}
-      }
-      document.addEventListener('fullscreenchange', function () {
-        diag('fullscreenchange', { fullscreenElement: !!document.fullscreenElement });
-      });
-      document.addEventListener('webkitfullscreenchange', function () {
-        diag('webkitfullscreenchange', { webkitFullscreenElement: !!document.webkitFullscreenElement });
-      });
-
       var tag = document.createElement('script');
       tag.src = 'https://www.youtube.com/iframe_api';
       document.body.appendChild(tag);
 
-      var player, playing = false;
-      var playBtn = document.getElementById('playPause');
-      var fsBtn = document.getElementById('fullscreen');
-
       function onYouTubeIframeAPIReady() {
-        player = new YT.Player('player', {
+        new YT.Player('player', {
           videoId: '${videoId}',
           playerVars: {
-            autoplay: 1, playsinline: 1, rel: 0, controls: 0,
+            autoplay: 1, playsinline: 1, rel: 0, controls: 1,
             modestbranding: 1, iv_load_policy: 3, origin: '${EMBED_ORIGIN}'
-          },
-          events: { onStateChange: onStateChange }
-        });
-      }
-
-      function onStateChange(e) {
-        playing = e.data === YT.PlayerState.PLAYING;
-        playBtn.textContent = playing ? '❚❚' : '▶';
-      }
-
-      playBtn.addEventListener('click', function () {
-        if (!player || !player.playVideo) return;
-        if (playing) { player.pauseVideo(); } else { player.playVideo(); }
-      });
-
-      fsBtn.addEventListener('click', function () {
-        var el = document.getElementById('player');
-        diag('fullscreen button tapped', {
-          hasRequestFullscreen: !!el.requestFullscreen,
-          hasWebkitRequestFullscreen: !!el.webkitRequestFullscreen
-        });
-        try {
-          var result;
-          if (el.requestFullscreen) result = el.requestFullscreen();
-          else if (el.webkitRequestFullscreen) result = el.webkitRequestFullscreen();
-          else { diag('no fullscreen method available on element'); return; }
-          if (result && typeof result.then === 'function') {
-            result.then(
-              function () { diag('requestFullscreen promise resolved'); },
-              function (err) { diag('requestFullscreen promise rejected', { message: err && err.message }); }
-            );
-          } else {
-            diag('requestFullscreen call returned (no promise, or webkitRequestFullscreen)');
           }
-        } catch (err) {
-          diag('requestFullscreen threw synchronously', { message: err && err.message });
-        }
-      });
+        });
+      }
     </script>
   </body>
 </html>`;
@@ -573,27 +497,26 @@ export default function GameDetailScreen() {
                     source={{ html: youtubeEmbedHtml(game.videoId), baseUrl: EMBED_ORIGIN }}
                     allowsInlineMediaPlayback
                     mediaPlaybackRequiresUserAction={false}
-                    // FIXED 2026-09-08 (item 28, real fix — see
-                    // next-release-fix-log.md): the two prior attempts
-                    // (088af04a: removing the iframe's own
-                    // `allow="picture-in-picture"` attribute; 17ab0e7c:
-                    // `controls=0` + custom play/pause/fullscreen buttons in
-                    // youtubeEmbedHtml() above) both only edited the web
-                    // content running INSIDE the WebView. Neither touched
-                    // this: allowsPictureInPictureMediaPlayback is a
-                    // react-native-webview prop that defaults to `true` on
-                    // iOS and configures WKWebView's own native
+                    // FIXED 2026-09-08 (item 28): allowsPictureInPictureMediaPlayback
+                    // is a react-native-webview prop that defaults to `true`
+                    // on iOS and configures WKWebView's own native
                     // wkWebViewConfig.allowsPictureInPictureMediaPlayback —
                     // a WKWebView-engine-level permission for ANY <video> it
                     // renders, entirely independent of the embedded page's
-                    // own HTML/JS. YouTube's IFrame Player still renders a
-                    // real <video> under the hood regardless of controls=0
-                    // or the iframe's own `allow` list, so WKWebView kept
-                    // offering its native PiP affordance no matter what the
-                    // page content did. This is the one prop that actually
-                    // disables it at the source. Android has no equivalent
-                    // (react-native-webview implements this prop on
-                    // iOS/macOS only), consistent with the bug being iOS-only.
+                    // own HTML/JS or which controls it draws. This is the
+                    // prop that actually disables native PiP at the source,
+                    // and it's kept `false` even now that youtubeEmbedHtml()
+                    // above is back to YouTube's real native controls
+                    // (rather than reverted alongside that change): the
+                    // original complaint here was specifically an unwanted
+                    // floating PiP window popping up over the app from nearby/
+                    // incidental taps or gestures, not a deliberate button
+                    // press — and YouTube's mobile embed control bar doesn't
+                    // expose its own explicit "enter PiP" button the way a
+                    // native video app does, so there's no legitimate
+                    // deliberate-tap PiP affordance being given up here to
+                    // weigh against keeping this disabled. Revisit if that
+                    // turns out to be wrong on-device.
                     allowsPictureInPictureMediaPlayback={false}
                     // ADDED 2026-08-20 (fix): the embed's fullscreen button
                     // did nothing on Android, worked fine on iOS. Confirmed,
@@ -605,22 +528,6 @@ export default function GameDetailScreen() {
                     // allowsInlineMediaPlayback above), which is exactly why
                     // this only showed up on Android.
                     allowsFullscreenVideo
-                    // TEMPORARY DIAGNOSTIC (2026-09-08, item 28 continued) —
-                    // see the matching comment above youtubeEmbedHtml(). Logs
-                    // whatever the injected page's diag() calls post, straight
-                    // to this Metro terminal, so we get real on-device signal
-                    // about what actually happens when the fullscreen button
-                    // is tapped without needing Safari Web Inspector (no Mac
-                    // in this setup). Remove alongside the HTML-side diag
-                    // block once we have a real answer.
-                    onMessage={(event) => {
-                      try {
-                        const msg = JSON.parse(event.nativeEvent.data);
-                        if (msg && msg.tag === 'trailer-fs-diag') {
-                          console.log('[trailer-fs-diag]', msg.label, msg.extra || '');
-                        }
-                      } catch {}
-                    }}
                   />
                 ) : (
                   <Pressable style={StyleSheet.absoluteFill} onPress={() => setTrailerPlaying(true)}>
