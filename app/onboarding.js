@@ -154,10 +154,25 @@ export default function OnboardingScreen() {
             <Text style={styles.sub}>
               {(() => {
                 const platBit = selected.size === 1 ? PLATFORMS[[...selected][0]].full : null;
-                const genreBit = selectedGenres.size === 1 ? [...selectedGenres][0] : null;
+                // FIXED 2026-09-08: this used to only ever acknowledge a
+                // genre pick when exactly one was selected, matching
+                // finish()'s own real filtering behavior below (see its
+                // comment) — but picking 2+ genres silently fell through to
+                // the same copy as picking none at all, reading as if the
+                // picks were ignored rather than deliberately not turned
+                // into a single filter (the "pick a genre to lead with"
+                // framing on the previous screen is explicitly singular).
+                // No change to what's actually filtered here — genreCount > 1
+                // still applies no genre filter, exactly as before — this
+                // just stops the summary from misrepresenting a multi-genre
+                // pick as if nothing had been chosen.
+                const genreCount = selectedGenres.size;
+                const genreBit = genreCount === 1 ? [...selectedGenres][0] : null;
                 if (platBit && genreBit) return `Showing ${genreBit} releases on ${platBit} first. You can change this anytime.`;
+                if (platBit && genreCount > 1) return `Showing ${platBit} releases first, across all your picked genres. You can change this anytime.`;
                 if (platBit) return `Showing ${platBit} releases first. You can change this anytime.`;
                 if (genreBit) return `Showing ${genreBit} releases first. You can change this anytime.`;
+                if (genreCount > 1) return "Good picks — we'll show every upcoming release for now since you chose a few genres. You can filter anytime.";
                 return "You're seeing every upcoming release. You can filter anytime.";
               })()}
             </Text>
