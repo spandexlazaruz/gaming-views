@@ -28,6 +28,21 @@ const CARD_WIDTH_RATIO = 0.82;
 const CARD_GAP = 10;
 const CARD_WIDTH = SCREEN_WIDTH * CARD_WIDTH_RATIO;
 
+// FIXED 2026-09-08 (item 30): Dan reported that tapping a hero card added
+// the game to the Watchlist instead of opening its detail page. Reading the
+// real code: only the small title `Text` had a navigate handler — the rest
+// of the card (the poster image, subtitle, meta line — most of the card's
+// visible area) had no handler at all, while "ADD TO WATCHLIST" below it is
+// a full-width button that takes up a good chunk of the card's bottom
+// section. A tap anywhere on the card except the one or two lines of title
+// text was either a no-op or, if it landed low enough, hit that button —
+// which reads exactly like "tapping the card adds it to the watchlist,"
+// even though technically only one specific button ever did that. Every
+// other card type in this app (GameCard.js — Calendar, Watchlist, Search,
+// "Also Releasing") wraps the WHOLE card in one Pressable that navigates,
+// with the watchlist toggle as its own small nested Pressable that calls
+// `e.stopPropagation()` so the two never fight over the same tap — mirrored
+// here exactly, replacing the old title-only Pressable.
 function HeroCard({ game, rankIndex, isSaved, onToggleWatchlist, onPress }) {
   const theme = posterThemes[hashStr(game.title) % posterThemes.length];
   const days = daysUntil(game.date);
@@ -39,7 +54,7 @@ function HeroCard({ game, rankIndex, isSaved, onToggleWatchlist, onPress }) {
   const badgeLabel = rankIndex === 0 ? '🔥 MOST ANTICIPATED' : rankIndex != null ? `#${rankIndex + 1} ANTICIPATED` : null;
 
   return (
-    <View style={styles.card}>
+    <Pressable style={styles.card} onPress={onPress}>
       {game.coverUrl ? (
         <Image source={{ uri: game.coverUrl }} style={StyleSheet.absoluteFill} resizeMode="cover" />
       ) : (
@@ -55,9 +70,7 @@ function HeroCard({ game, rankIndex, isSaved, onToggleWatchlist, onPress }) {
           <Text style={styles.rankBadgeText}>{badgeLabel}</Text>
         </View>
       )}
-      <Pressable onPress={onPress}>
-        <Text style={styles.cardTitle} numberOfLines={2}>{game.title}</Text>
-      </Pressable>
+      <Text style={styles.cardTitle} numberOfLines={2}>{game.title}</Text>
       <Text style={styles.cardSub} numberOfLines={1}>
         Releasing on {game.platforms.map((p) => PLATFORMS[p].full).join(', ')}.
       </Text>
@@ -66,13 +79,13 @@ function HeroCard({ game, rankIndex, isSaved, onToggleWatchlist, onPress }) {
       </Text>
       <Pressable
         style={[styles.cardBtn, isSaved && styles.cardBtnSaved]}
-        onPress={onToggleWatchlist}
+        onPress={(e) => { e.stopPropagation(); onToggleWatchlist(); }}
       >
         <Text style={[styles.cardBtnText, isSaved && { color: colors.orange }]}>
           {isSaved ? '❤️ ADDED TO WATCHLIST' : '🤍 ADD TO WATCHLIST'}
         </Text>
       </Pressable>
-    </View>
+    </Pressable>
   );
 }
 

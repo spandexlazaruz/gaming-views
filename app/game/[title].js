@@ -59,37 +59,90 @@ function toLargeScreenshotUrl(url) {
   return url.replace('t_screenshot_big', 't_1080p');
 }
 
-// FIXED 2026-08-20 (still later): Dan found that tapping just to the left or
-// right of the play/pause button (not on it) popped up a small floating
-// "mini player" window over the app — not a bug in this app's own UI, but
-// YouTube's native Picture-in-Picture, which the iframe was explicitly
-// opting into. `allow="picture-in-picture"` is the standard permission
-// YouTube's own official embed snippet includes by default, and it's a real
-// browser-level Permissions Policy grant (confirmed via MDN's
-// Permissions-Policy/picture-in-picture docs): with it present, YouTube's
-// player is free to call the underlying <video> element's
-// requestPictureInPicture() from any of its own tap zones; without it, that
-// call throws a SecurityError and is blocked outright, regardless of which
-// exact spot inside YouTube's own UI triggers it. Since the trailer already
-// plays inside this app's own full-screen modal, there's no legitimate need
-// for the video to be able to float free of it — removed `picture-in-picture`
-// from the `allow` list below. Unrelated to, and doesn't affect, the
-// separate `allowfullscreen`/`allowsFullscreenVideo` fullscreen-button fix
-// above (a different permission, the HTML5 Fullscreen API, not this one).
+// FIXED 2026-08-20 (still later), first attempt: Dan found that tapping just
+// to the left or right of the play/pause button (not on it) popped up a
+// small floating "mini player" window over the app. First theory was
+// YouTube's native Picture-in-Picture via the `allow="picture-in-picture"`
+// permission (a real browser-level Permissions Policy grant, confirmed via
+// MDN's docs) — removed it from the `allow` list below. Dan confirmed
+// on-device, 2026-08-21, that this did NOT fix it.
+//
+// FIXED FOR REAL 2026-09-08 (item 28): researched further after the first
+// attempt was confirmed not to work. The floating thumbnail is YouTube's own
+// in-page "miniplayer" UI — native player chrome rendered inside the iframe
+// itself, entirely unrelated to the browser-level PiP API the first attempt
+// targeted — and there's no documented parameter to disable the miniplayer
+// specifically (confirmed against YouTube's own Embedded Players and
+// Player Parameters docs, and the IFrame Player API reference — see the
+// sources on this in next-release-fix-log.md item 28). The only real way to
+// stop it: don't render YouTube's native control chrome at all.
+// `controls=0` does that — no play/pause, no seek bar, no fullscreen
+// button, no miniplayer tap zones — replaced here with a small custom
+// play/pause and fullscreen control pair, driven by the real YouTube IFrame
+// Player API (`enablejsapi` is implicit once the page loads
+// https://www.youtube.com/iframe_api and constructs a real `YT.Player`,
+// rather than a bare <iframe src=...> like before). Known trade-off, being
+// upfront about it: no scrub/seek bar in this pass — tap-to-play/pause and
+// tap-to-fullscreen only. A real scrub control is a reasonable follow-up if
+// it turns out to be missed, but needs its own drag-handling and on-device
+// testing pass, not just another parameter flip like this fix.
 function youtubeEmbedHtml(videoId) {
   return `<!DOCTYPE html>
 <html>
   <head>
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-    <style>html,body{margin:0;padding:0;background:#000;height:100%;overflow:hidden;}iframe{position:absolute;top:0;left:0;width:100%;height:100%;border:0;}</style>
+    <style>
+      html,body{margin:0;padding:0;background:#000;height:100%;overflow:hidden;}
+      #player{position:absolute;top:0;left:0;width:100%;height:100%;}
+      .ctrl{
+        position:absolute; z-index:5; border:0; border-radius:999px;
+        background:rgba(10,12,16,0.6); color:#fff; display:flex;
+        align-items:center; justify-content:center; padding:0;
+      }
+      #playPause{ left:50%; top:50%; width:52px; height:52px; margin:-26px 0 0 -26px; font-size:19px; }
+      #fullscreen{ right:10px; bottom:10px; width:34px; height:34px; font-size:13px; }
+    </style>
   </head>
   <body>
-    <iframe
-      src="https://www.youtube.com/embed/${videoId}?autoplay=1&playsinline=1&rel=0&origin=${EMBED_ORIGIN}"
-      frameborder="0"
-      allow="accelerometer; autoplay; encrypted-media; gyroscope"
-      allowfullscreen
-    ></iframe>
+    <div id="player"></div>
+    <button id="playPause" class="ctrl">❚❚</button>
+    <button id="fullscreen" class="ctrl">⛶</button>
+    <script>
+      var tag = document.createElement('script');
+      tag.src = 'https://www.youtube.com/iframe_api';
+      document.body.appendChild(tag);
+
+      var player, playing = false;
+      var playBtn = document.getElementById('playPause');
+      var fsBtn = document.getElementById('fullscreen');
+
+      function onYouTubeIframeAPIReady() {
+        player = new YT.Player('player', {
+          videoId: '${videoId}',
+          playerVars: {
+            autoplay: 1, playsinline: 1, rel: 0, controls: 0,
+            modestbranding: 1, iv_load_policy: 3, origin: '${EMBED_ORIGIN}'
+          },
+          events: { onStateChange: onStateChange }
+        });
+      }
+
+      function onStateChange(e) {
+        playing = e.data === YT.PlayerState.PLAYING;
+        playBtn.textContent = playing ? '❚❚' : '▶';
+      }
+
+      playBtn.addEventListener('click', function () {
+        if (!player || !player.playVideo) return;
+        if (playing) { player.pauseVideo(); } else { player.playVideo(); }
+      });
+
+      fsBtn.addEventListener('click', function () {
+        var el = document.getElementById('player');
+        if (el.requestFullscreen) el.requestFullscreen();
+        else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+      });
+    </script>
   </body>
 </html>`;
 }

@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { View, Text, SectionList, ScrollView, Pressable, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { colors, PLATFORMS, GENRES } from '../../lib/theme';
@@ -57,9 +57,40 @@ function pickRecommended(games) {
 export default function CalendarScreen() {
   const router = useRouter();
   const { games, loading, error, refetch } = useGames();
-  const { saved, toggleWatchlist, preferredPlatform, preferredGenre } = useWatchlist();
-  const [activePlatform, setActivePlatform] = useState(preferredPlatform);
-  const [activeGenre, setActiveGenre] = useState(preferredGenre);
+  const { saved, toggleWatchlist, preferredPlatform, preferredGenre, hydrated } = useWatchlist();
+  // FIXED 2026-09-08 (item 29): onboarding's platform/genre picks (see
+  // app/onboarding.js's finish(), which calls setPreferredPlatform/
+  // setPreferredGenre) genuinely were reaching WatchlistContext and being
+  // persisted — but this screen used to seed its own filter state with
+  // `useState(preferredPlatform)`/`useState(preferredGenre)`, which only
+  // ever captures a value ONCE, at this component's own first render.
+  // WatchlistContext's `preferredPlatform`/`preferredGenre` are themselves
+  // loaded from AsyncStorage asynchronously on app start (see the hydration
+  // effect in WatchlistContext.js) — on a normal app open this resolves
+  // long before the Calendar tab is ever visited, but there's no guarantee
+  // of that ordering (e.g. right after onboarding finishes and navigates
+  // straight here), and when it lost that race the seeded value was
+  // whatever the still-default 'all' happened to be — silently, with
+  // nothing to indicate a preference existed at all. That's exactly what
+  // read as "the onboarding filters don't actually do anything."
+  //
+  // Fixed by always starting on 'all' here and applying the real preference
+  // once, via an effect keyed on `hydrated` — that flag is guaranteed to be
+  // true by the time this effect can possibly matter (either hydration
+  // finished well before this screen mounted, the common case, or it flips
+  // true while this screen is already mounted and the effect re-fires) — so
+  // this can no longer lose the race regardless of exact mount timing.
+  // Deliberately a one-time seed, not continuous syncing: `hydrated` only
+  // transitions false→true once per app session, so a user's own chip taps
+  // afterward are never overwritten by this effect re-firing.
+  const [activePlatform, setActivePlatform] = useState('all');
+  const [activeGenre, setActiveGenre] = useState('all');
+  useEffect(() => {
+    if (!hydrated) return;
+    setActivePlatform(preferredPlatform);
+    setActiveGenre(preferredGenre);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hydrated]);
   // No "preferred month" concept, unlike platform/genre — the whole point of
   // this filter is a rolling window that shifts day to day, so there's
   // nothing sensible to persist as a default. Always starts on "All Months".
