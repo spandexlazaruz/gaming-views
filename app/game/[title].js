@@ -520,6 +520,28 @@ export default function GameDetailScreen() {
                     source={{ html: youtubeEmbedHtml(game.videoId), baseUrl: EMBED_ORIGIN }}
                     allowsInlineMediaPlayback
                     mediaPlaybackRequiresUserAction={false}
+                    // FIXED 2026-09-08 (item 28, real fix — see
+                    // next-release-fix-log.md): the two prior attempts
+                    // (088af04a: removing the iframe's own
+                    // `allow="picture-in-picture"` attribute; 17ab0e7c:
+                    // `controls=0` + custom play/pause/fullscreen buttons in
+                    // youtubeEmbedHtml() above) both only edited the web
+                    // content running INSIDE the WebView. Neither touched
+                    // this: allowsPictureInPictureMediaPlayback is a
+                    // react-native-webview prop that defaults to `true` on
+                    // iOS and configures WKWebView's own native
+                    // wkWebViewConfig.allowsPictureInPictureMediaPlayback —
+                    // a WKWebView-engine-level permission for ANY <video> it
+                    // renders, entirely independent of the embedded page's
+                    // own HTML/JS. YouTube's IFrame Player still renders a
+                    // real <video> under the hood regardless of controls=0
+                    // or the iframe's own `allow` list, so WKWebView kept
+                    // offering its native PiP affordance no matter what the
+                    // page content did. This is the one prop that actually
+                    // disables it at the source. Android has no equivalent
+                    // (react-native-webview implements this prop on
+                    // iOS/macOS only), consistent with the bug being iOS-only.
+                    allowsPictureInPictureMediaPlayback={false}
                     // ADDED 2026-08-20 (fix): the embed's fullscreen button
                     // did nothing on Android, worked fine on iOS. Confirmed,
                     // not guessed — allowsFullscreenVideo is an Android-only
