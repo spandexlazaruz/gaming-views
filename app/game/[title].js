@@ -86,6 +86,21 @@ function toLargeScreenshotUrl(url) {
 // tap-to-fullscreen only. A real scrub control is a reasonable follow-up if
 // it turns out to be missed, but needs its own drag-handling and on-device
 // testing pass, not just another parameter flip like this fix.
+// TEMPORARY DIAGNOSTIC (2026-09-08, item 28 continued): two prior fix
+// attempts (088af04a, then allowsPictureInPictureMediaPlayback in 189c7a92)
+// didn't resolve Dan's screen-recorded report that the fullscreen button
+// triggers a native iOS video handoff (washed-out transition, then a
+// separate Now Playing/Control Center session) instead of expanding
+// in-page. No Mac/Safari Web Inspector available to attach to the WKWebView
+// directly, so this posts real on-device signal back to RN instead: every
+// fullscreenchange/webkitfullscreenchange event on the outer document (the
+// one thing still reachable from here — the nested YouTube iframe's own
+// document is cross-origin and can't be inspected), plus whatever the
+// button's requestFullscreen()/webkitRequestFullscreen() call itself
+// actually does (resolves, rejects, or throws synchronously) — see the
+// onMessage handler on the <WebView> below, which logs it straight to this
+// Metro terminal. Strip this whole block back out once we have a real
+// answer; it has no purpose beyond that.
 function youtubeEmbedHtml(videoId) {
   return `<!DOCTYPE html>
 <html>
@@ -108,6 +123,26 @@ function youtubeEmbedHtml(videoId) {
     <button id="playPause" class="ctrl">❚❚</button>
     <button id="fullscreen" class="ctrl">⛶</button>
     <script>
+      // TEMPORARY DIAGNOSTIC — see comment above youtubeEmbedHtml() in
+      // app/game/[title].js. Remove this whole block, and the two
+      // fullscreenchange/webkitfullscreenchange listeners below, once we
+      // have a real answer.
+      function diag(label, extra) {
+        try {
+          if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
+            window.ReactNativeWebView.postMessage(JSON.stringify({
+              tag: 'trailer-fs-diag', label: label, extra: extra || null, ts: Date.now()
+            }));
+          }
+        } catch (e) {}
+      }
+      document.addEventListener('fullscreenchange', function () {
+        diag('fullscreenchange', { fullscreenElement: !!document.fullscreenElement });
+      });
+      document.addEventListener('webkitfullscreenchange', function () {
+        diag('webkitfullscreenchange', { webkitFullscreenElement: !!document.webkitFullscreenElement });
+      });
+
       var tag = document.createElement('script');
       tag.src = 'https://www.youtube.com/iframe_api';
       document.body.appendChild(tag);
@@ -139,8 +174,26 @@ function youtubeEmbedHtml(videoId) {
 
       fsBtn.addEventListener('click', function () {
         var el = document.getElementById('player');
-        if (el.requestFullscreen) el.requestFullscreen();
-        else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+        diag('fullscreen button tapped', {
+          hasRequestFullscreen: !!el.requestFullscreen,
+          hasWebkitRequestFullscreen: !!el.webkitRequestFullscreen
+        });
+        try {
+          var result;
+          if (el.requestFullscreen) result = el.requestFullscreen();
+          else if (el.webkitRequestFullscreen) result = el.webkitRequestFullscreen();
+          else { diag('no fullscreen method available on element'); return; }
+          if (result && typeof result.then === 'function') {
+            result.then(
+              function () { diag('requestFullscreen promise resolved'); },
+              function (err) { diag('requestFullscreen promise rejected', { message: err && err.message }); }
+            );
+          } else {
+            diag('requestFullscreen call returned (no promise, or webkitRequestFullscreen)');
+          }
+        } catch (err) {
+          diag('requestFullscreen threw synchronously', { message: err && err.message });
+        }
       });
     </script>
   </body>
@@ -552,6 +605,22 @@ export default function GameDetailScreen() {
                     // allowsInlineMediaPlayback above), which is exactly why
                     // this only showed up on Android.
                     allowsFullscreenVideo
+                    // TEMPORARY DIAGNOSTIC (2026-09-08, item 28 continued) —
+                    // see the matching comment above youtubeEmbedHtml(). Logs
+                    // whatever the injected page's diag() calls post, straight
+                    // to this Metro terminal, so we get real on-device signal
+                    // about what actually happens when the fullscreen button
+                    // is tapped without needing Safari Web Inspector (no Mac
+                    // in this setup). Remove alongside the HTML-side diag
+                    // block once we have a real answer.
+                    onMessage={(event) => {
+                      try {
+                        const msg = JSON.parse(event.nativeEvent.data);
+                        if (msg && msg.tag === 'trailer-fs-diag') {
+                          console.log('[trailer-fs-diag]', msg.label, msg.extra || '');
+                        }
+                      } catch {}
+                    }}
                   />
                 ) : (
                   <Pressable style={StyleSheet.absoluteFill} onPress={() => setTrailerPlaying(true)}>
