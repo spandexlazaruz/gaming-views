@@ -196,6 +196,21 @@ export default function GameCard({ game, highlightPlatform, showReminder, multiP
               <Text style={styles.badgeSoonText}>{badgeText}</Text>
             </View>
           )}
+          {/* ADDED (item 39 — Xbox Game Pass badge): true only when IGDB's
+              own data confirms it (see the backend's hasXboxGamePass) — in
+              practice this only ever fires on "What You Missed" cards
+              (already-released games), since IGDB doesn't tag it ahead of
+              release. Never rendered as a negative/absent state — a missing
+              flag isn't confirmation a game ISN'T on Game Pass, just that
+              IGDB doesn't have (or doesn't yet have) that record, so there's
+              deliberately no "else" branch here. Xbox's own brand green,
+              same color already used for the Xbox platform tag elsewhere on
+              this card (lib/theme.js's PLATFORMS.xbox). */}
+          {game.xboxGamePass && (
+            <View style={styles.gamePassBadge}>
+              <Text style={styles.gamePassBadgeText}>GAME PASS</Text>
+            </View>
+          )}
         </View>
         {reminderLabel && (
           <View style={styles.reminderRow}>
@@ -272,6 +287,14 @@ const styles = StyleSheet.create({
   miniBadgeText: { fontSize: 8, fontFamily: 'Inter_600SemiBold', letterSpacing: 0.2, textTransform: 'uppercase' },
   badgeSoon: { backgroundColor: colors.orangeDim, borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2.5 },
   badgeSoonText: { fontSize: 11, fontFamily: 'Inter_600SemiBold', color: colors.orange },
+  // Same pill shape/padding as badgeSoon above and the deckBadge pattern
+  // used on the Steam row below, filled with Xbox's own brand green
+  // (PLATFORMS.xbox.color) rather than a wash — matches the solid-fill
+  // platTag/miniBadge platform badges elsewhere on this card more closely
+  // than the translucent deck badges, since this is tied to one specific
+  // platform holder's brand rather than a generic status pill.
+  gamePassBadge: { backgroundColor: PLATFORMS.xbox.color, borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2.5 },
+  gamePassBadgeText: { fontSize: 10, fontFamily: 'Inter_600SemiBold', color: PLATFORMS.xbox.textColor, letterSpacing: 0.3, textTransform: 'uppercase' },
   reminderRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 2 },
   reminderText: { fontSize: 11, fontFamily: 'Inter_500Medium', color: colors.orange },
   steamRow: { flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: 2, flexWrap: 'wrap' },
