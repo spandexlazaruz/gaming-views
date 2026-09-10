@@ -213,6 +213,17 @@ export default function CalendarScreen() {
         onOpenGame={(title) => router.push(`/game/${encodeURIComponent(title)}`)}
       />
 
+      {/* ADDED (item 35 — "What You Missed"): entry point into the fixed
+          last-month-releases screen — see app/what-you-missed.js. A plain
+          row rather than a new tab or a chip in the filter rows below: it's
+          a one-off fixed window, not another filterable dimension of this
+          same upcoming-releases list, so it doesn't belong grouped with the
+          platform/genre/month chips. */}
+      <Pressable style={styles.missedRow} onPress={() => router.push('/what-you-missed')}>
+        <Text style={styles.missedRowText}>📅 What You Missed Last Month</Text>
+        <Text style={styles.missedRowChev}>›</Text>
+      </Pressable>
+
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filters} contentContainerStyle={{ gap: 8, paddingHorizontal: 16 }}>
         {platformChips.map((c) => (
           <Pressable
@@ -300,6 +311,13 @@ export default function CalendarScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bgPage },
+  missedRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    backgroundColor: colors.bgCard, borderWidth: 1, borderColor: colors.line,
+    borderRadius: 12, marginHorizontal: 16, marginTop: 14, paddingHorizontal: 14, paddingVertical: 12,
+  },
+  missedRowText: { fontFamily: 'Inter_600SemiBold', fontSize: 12.5, color: colors.white },
+  missedRowChev: { color: colors.mutedDim, fontSize: 18 },
   filters: { borderBottomWidth: 1, borderBottomColor: colors.line, paddingTop: 14, paddingBottom: 10 },
   filtersSecondary: { borderBottomWidth: 1, borderBottomColor: colors.line, paddingTop: 4, paddingBottom: 14 },
   chip: { paddingHorizontal: 15, paddingVertical: 8, borderRadius: 999, backgroundColor: colors.bgCard, borderWidth: 1, borderColor: colors.line },

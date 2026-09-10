@@ -99,6 +99,7 @@ export default Sentry.wrap(function RootLayout() {
               <Stack.Screen name="accounts" options={{ presentation: 'modal' }} />
               <Stack.Screen name="settings" options={{ presentation: 'modal' }} />
               <Stack.Screen name="notifications" options={{ presentation: 'modal' }} />
+              <Stack.Screen name="what-you-missed" options={{ presentation: 'modal' }} />
             </Stack>
           </WatchlistProvider>
         </GamesProvider>
