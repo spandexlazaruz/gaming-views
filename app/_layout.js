@@ -9,6 +9,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ScreenOrientation from 'expo-screen-orientation';
 import { WatchlistProvider } from '../lib/WatchlistContext';
 import { GamesProvider } from '../lib/GamesContext';
+import { recordAppOpenDay } from '../lib/reviewPrompt';
 import { colors } from '../lib/theme';
 import * as Sentry from '@sentry/react-native';
 
@@ -72,6 +73,15 @@ export default Sentry.wrap(function RootLayout() {
   // itself and relocks on close — see its own effect for why.
   useEffect(() => {
     ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch(() => {});
+  }, []);
+
+  // ADDED (item 36 — in-app review prompt): records today as a distinct day
+  // the app's been opened, feeding the review prompt's "used on at least 2
+  // separate calendar days" gate (see lib/reviewPrompt.js) — this is the one
+  // place in the app that's guaranteed to run exactly once per real app
+  // launch, regardless of which screen someone lands on first.
+  useEffect(() => {
+    recordAppOpenDay().catch(() => {});
   }, []);
 
   // ADDED 2026-08-20: GestureHandlerRootView now wraps the whole app —
