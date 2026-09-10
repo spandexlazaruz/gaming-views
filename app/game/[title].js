@@ -134,13 +134,23 @@ export default function GameDetailScreen() {
   const arrivedPlatform = Array.isArray(platform) ? platform[0] : platform;
   const router = useRouter();
   const { games, loading } = useGames();
-  const { saved, savedPlatforms, toggleWatchlist, reminders, setReminderLead } = useWatchlist();
+  const { saved, savedPlatforms, toggleWatchlist, reminders, setReminderLead, calendarAdded, markCalendarAdded } = useWatchlist();
   const [storePickerOpen, setStorePickerOpen] = useState(false);
   const [storeChecking, setStoreChecking] = useState(false);
-  // ADDED (item 37 — add to calendar): idle | adding | added | denied,
-  // same button-label-swap pattern as storeChecking above and
-  // NotificationsScreen's testState — no native Alert anywhere in this app,
-  // feedback always lives in the button's own text instead.
+  // ADDED (item 37 — add to calendar): idle | adding | denied — genuinely
+  // transient, local, in-flight feedback only. Same button-label-swap
+  // pattern as storeChecking above and NotificationsScreen's testState — no
+  // native Alert anywhere in this app, feedback always lives in the
+  // button's own text instead.
+  // FIXED (item 41 — button state bug): this used to include an 'added'
+  // state too, reverted back to 'idle' by an unconditional
+  // setTimeout(…, 4000) regardless of outcome — meaning a successful add
+  // silently forgot it had succeeded a few seconds later, and a repeat tap
+  // created a genuine duplicate calendar event, since nothing else recorded
+  // "already added" anywhere. Permanent "added" state now lives in
+  // WatchlistContext's calendarAdded (see alreadyAddedToCalendar below),
+  // persisted the same way reminders/savedGameSnapshots already are — this
+  // local state no longer needs (or has) an 'added' case at all.
   const [calendarState, setCalendarState] = useState('idle');
   // ADDED 2026-08-20 (game detail page enrichment — description/trailer/
   // screenshots, layout locked 2026-08-20): descExpanded/descTruncatable
@@ -311,25 +321,51 @@ export default function GameDetailScreen() {
   // (reminders[game.title], same map lib/notifications.js's push reminder
   // already reads), not a live link to it — there's no created-event ID
   // tracked/persisted anywhere, so a later lead-time change here has
-  // nothing to find and update. Resets back to idle after a few seconds
-  // either way, same transient-feedback duration NotificationsScreen's own
-  // test-notification button already uses.
+  // nothing to find and update.
+  // FIXED (item 41 — button state bug): guarded on alreadyAddedToCalendar
+  // too now, not just the in-flight `adding` check — see that constant's
+  // comment below for why a second tap has to be blocked outright rather
+  // than just reverting to a fresh idle button. Only the failure path still
+  // auto-reverts after a few seconds (genuinely transient — nothing
+  // permanent happened, there's nothing to remember); a success marks
+  // WatchlistContext's calendarAdded and leaves local state alone entirely,
+  // since alreadyAddedToCalendar now takes over rendering the button from
+  // here on.
   const handleAddToCalendar = async () => {
-    if (calendarState === 'adding') return;
+    if (alreadyAddedToCalendar || calendarState === 'adding') return;
     setCalendarState('adding');
     const leadKey = reminders[game.title] || 'release_day';
     const lead = LEAD_OPTIONS.find((o) => o.key === leadKey) || LEAD_OPTIONS[0];
     const added = await addGameReleaseToCalendar(game, lead.days);
-    setCalendarState(added ? 'added' : 'denied');
-    setTimeout(() => setCalendarState('idle'), 4000);
+    if (added) {
+      markCalendarAdded(game.title);
+      setCalendarState('idle');
+    } else {
+      setCalendarState('denied');
+      setTimeout(() => setCalendarState('idle'), 4000);
+    }
   };
 
-  const calendarBtnLabel = {
-    idle: '📅 ADD TO CALENDAR',
-    adding: 'ADDING…',
-    added: '✅ ADDED TO CALENDAR',
-    denied: "COULDN'T ADD — CHECK CALENDAR PERMISSION",
-  }[calendarState];
+  // ADDED (item 41 — button state bug): the actual persisted "already
+  // added" signal — see WatchlistContext's calendarAdded for why this
+  // outlives the local calendarState cycle above (and survives navigating
+  // away/back, an app restart, anything). Once true, the button both reads
+  // as permanently confirmed AND is disabled — see the Pressable below —
+  // rather than staying tappable with some "you already added this"
+  // message: unlike the ADD TO WATCHLIST heart, this isn't a real toggle
+  // (there's no tracked event ID to find and remove), so a second tap can
+  // only ever do one harmful thing (create a duplicate) and never anything
+  // useful. Disabling it removes that possibility outright instead of
+  // relying on messaging to talk someone out of tapping it again.
+  const alreadyAddedToCalendar = !!calendarAdded[game.title];
+
+  const calendarBtnLabel = alreadyAddedToCalendar
+    ? '✅ ADDED TO CALENDAR'
+    : {
+        idle: '📅 ADD TO CALENDAR',
+        adding: 'ADDING…',
+        denied: "COULDN'T ADD — CHECK CALENDAR PERMISSION",
+      }[calendarState];
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -457,9 +493,9 @@ export default function GameDetailScreen() {
               currently selected there (see handleAddToCalendar above). */}
           {isSaved && (
             <Pressable
-              style={[styles.storeBtn, calendarState === 'adding' && styles.storeBtnDisabled]}
+              style={[styles.storeBtn, (calendarState === 'adding' || alreadyAddedToCalendar) && styles.storeBtnDisabled]}
               onPress={handleAddToCalendar}
-              disabled={calendarState === 'adding'}
+              disabled={calendarState === 'adding' || alreadyAddedToCalendar}
             >
               <Text style={styles.storeBtnText}>{calendarBtnLabel}</Text>
             </Pressable>
