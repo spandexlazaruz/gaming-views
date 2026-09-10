@@ -305,13 +305,21 @@ export default function GameDetailScreen() {
     }
   };
 
-  // ADDED (item 37 — add to calendar): resets back to idle after a few
-  // seconds either way, same transient-feedback duration
-  // NotificationsScreen's own test-notification button already uses.
+  // ADDED (item 37 — add to calendar), UPDATED (item 37 refinement — align
+  // to reminder lead-time): the event date/wording is a one-time snapshot
+  // of whatever lead-time is currently selected in the REMIND ME chips
+  // (reminders[game.title], same map lib/notifications.js's push reminder
+  // already reads), not a live link to it — there's no created-event ID
+  // tracked/persisted anywhere, so a later lead-time change here has
+  // nothing to find and update. Resets back to idle after a few seconds
+  // either way, same transient-feedback duration NotificationsScreen's own
+  // test-notification button already uses.
   const handleAddToCalendar = async () => {
     if (calendarState === 'adding') return;
     setCalendarState('adding');
-    const added = await addGameReleaseToCalendar(game);
+    const leadKey = reminders[game.title] || 'release_day';
+    const lead = LEAD_OPTIONS.find((o) => o.key === leadKey) || LEAD_OPTIONS[0];
+    const added = await addGameReleaseToCalendar(game, lead.days);
     setCalendarState(added ? 'added' : 'denied');
     setTimeout(() => setCalendarState('idle'), 4000);
   };
@@ -389,14 +397,6 @@ export default function GameDetailScreen() {
           </Pressable>
 
           <Pressable
-            style={[styles.storeBtn, calendarState === 'adding' && styles.storeBtnDisabled]}
-            onPress={handleAddToCalendar}
-            disabled={calendarState === 'adding'}
-          >
-            <Text style={styles.storeBtnText}>{calendarBtnLabel}</Text>
-          </Pressable>
-
-          <Pressable
             style={[styles.cta, isSaved && styles.ctaSaved]}
             onPress={() => {
               // Adding a game sets a default "Release Day" reminder immediately
@@ -447,6 +447,22 @@ export default function GameDetailScreen() {
                 })}
               </View>
             </View>
+          )}
+
+          {/* ADDED (item 37 refinement): only offered once the game is
+              actually watchlisted — same isSaved check the CTA/REMIND ME
+              chips above already use — and placed right below the lead-time
+              chips rather than up by VIEW IN STORE, since its own wording
+              and event date now depend directly on whichever lead-time is
+              currently selected there (see handleAddToCalendar above). */}
+          {isSaved && (
+            <Pressable
+              style={[styles.storeBtn, calendarState === 'adding' && styles.storeBtnDisabled]}
+              onPress={handleAddToCalendar}
+              disabled={calendarState === 'adding'}
+            >
+              <Text style={styles.storeBtnText}>{calendarBtnLabel}</Text>
+            </Pressable>
           )}
 
           {game.steam && (
