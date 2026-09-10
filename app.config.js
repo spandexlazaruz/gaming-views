@@ -56,11 +56,26 @@ module.exports = {
         },
       ],
       'expo-notifications',
+      // FIXED (dev-build crash — ExpoCalendarRemindersPermissionRequester /
+      // MissingCalendarPListValueException): remindersPermission: false used
+      // to omit NSRemindersUsageDescription entirely from Info.plist. That
+      // crashed on every launch regardless — expo-calendar's native module
+      // unconditionally probes BOTH Calendar and Reminders permission status
+      // in its own OnCreate (CalendarModule.swift's initializePermittedEntities,
+      // called the instant the module loads, not from any JS call this app
+      // makes), and that probe is a hard EXFatal crash if the Reminders plist
+      // key is missing — there's no way to opt out of the check itself in
+      // this SDK-54-pinned version. This app genuinely never uses Reminders
+      // (lib/calendarEvent.js only ever calls the Calendar-specific
+      // functions) and never calls requestRemindersPermissionsAsync, so no
+      // real Reminders permission dialog will ever show to a user — this
+      // string exists purely to satisfy that internal startup check, said
+      // honestly rather than copying the calendar description.
       [
         'expo-calendar',
         {
           calendarPermission: 'Gaming Views uses your calendar to add a release-date event for games you choose to add.',
-          remindersPermission: false,
+          remindersPermission: "Gaming Views doesn't use Reminders.",
         },
       ],
     ],
