@@ -295,6 +295,31 @@ export default function GameDetailScreen() {
   const displayDate = (arrivedPlatform && game.platformDates && game.platformDates[arrivedPlatform])
     || game.date;
   const days = daysUntil(displayDate);
+  // ADDED (item 33 — graceful "Deluxe Edition early access" note): the main
+  // date above is already the real Full Release date as of the backend fix
+  // (game.date/platformDates themselves changed meaning, not this screen's
+  // reading of them — see gaming-views-backend/api/games.js's
+  // buildPlatformDates). This surfaces game.earlyAccessDates (only present
+  // when IGDB genuinely has a distinct "Advanced Access"-status date for a
+  // platform) as an extra, secondary note — never instead of the real date.
+  // Same "arrived via a filtered platform link takes priority, otherwise
+  // group by matching dates" convention as displayDate/dateGroups above:
+  // a single shared date across every platform that has one (confirmed the
+  // common case across every real title checked) collapses to one plain
+  // date with no platform breakdown, matching how dateGroups itself already
+  // only bothers with a per-platform breakdown when dates genuinely differ.
+  const earlyAccessGroups = (() => {
+    if (!game.earlyAccessDates) return null;
+    const byKey = {};
+    for (const [platform, d] of Object.entries(game.earlyAccessDates)) {
+      const key = d.join('-');
+      if (!byKey[key]) byKey[key] = { date: d, platforms: [] };
+      byKey[key].platforms.push(platform);
+    }
+    const groups = Object.values(byKey);
+    return groups.length > 0 ? groups : null;
+  })();
+  const arrivedEarlyAccessDate = arrivedPlatform && game.earlyAccessDates && game.earlyAccessDates[arrivedPlatform];
   const stampText = days <= 0 ? 'OUT NOW' : days === 1 ? 'RELEASES TOMORROW' : `RELEASES IN ${days} DAYS`;
 
   const others = games.filter(
@@ -439,6 +464,33 @@ export default function GameDetailScreen() {
               );
             })}
           </View>
+
+          {/* ADDED (item 33 — graceful "Deluxe Edition early access" note):
+              a quiet, secondary line — same visual weight as blurbCta below
+              (dim, small, italic) rather than a loud badge, since this is a
+              nice-to-know extra for players who specifically care about
+              pre-order/deluxe early access, not something that should
+              compete with the real release date above it. Generic "Special
+              Edition" label rather than the real edition name (e.g. "Deluxe
+              Edition") — see gaming-views-backend/api/games.js's commit
+              message for why: the real name lives on a separately-linked
+              IGDB game entity with no direct link back to which specific
+              release_dates entry it corresponds to, and a base game can in
+              principle link to more than one edition variant, so naming a
+              specific edition here risked attributing the wrong one. */}
+          {arrivedEarlyAccessDate ? (
+            <Text style={styles.earlyAccessNote}>
+              Special Edition early access: {formatDateShort(arrivedEarlyAccessDate)}
+            </Text>
+          ) : (!arrivedPlatform && earlyAccessGroups) ? (
+            <Text style={styles.earlyAccessNote}>
+              Special Edition early access: {earlyAccessGroups.length === 1
+                ? formatDateShort(earlyAccessGroups[0].date)
+                : earlyAccessGroups
+                    .map((g) => `${g.platforms.map((p) => PLATFORMS[p].label).join('/')} ${formatDateShort(g.date)}`)
+                    .join('  ·  ')}
+            </Text>
+          ) : null}
 
           <Pressable
             style={[styles.storeBtn, storeChecking && styles.storeBtnDisabled]}
@@ -808,6 +860,10 @@ const styles = StyleSheet.create({
   title: { fontFamily: 'Poppins_800ExtraBold', fontSize: 23, color: colors.white, marginBottom: 10 },
   dateLine: { color: colors.muted, fontSize: 14, marginBottom: 14, fontFamily: 'Inter_500Medium' },
   platRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 20 },
+  // Same visual weight as blurbCta further down this stylesheet (dim, small,
+  // italic) — a quiet secondary note, not a badge competing with the real
+  // date above it. See the JSX comment above earlyAccessGroups for why.
+  earlyAccessNote: { fontSize: 12, color: colors.mutedDim, fontStyle: 'italic', fontFamily: 'Inter_500Medium', marginTop: -12, marginBottom: 14 },
   platChip: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
     backgroundColor: colors.bgCard, borderWidth: 1, borderColor: colors.line,
