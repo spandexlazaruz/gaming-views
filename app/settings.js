@@ -1,4 +1,4 @@
-import { View, Text, Pressable, Switch, ScrollView, Linking, StyleSheet } from 'react-native';
+import { View, Text, Pressable, Switch, ScrollView, Linking, Platform, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { colors } from '../lib/theme';
@@ -41,6 +41,23 @@ export default function SettingsScreen() {
     const subject = encodeURIComponent('Gaming Views Feedback');
     const body = encodeURIComponent('\n\n—\nSent from the Gaming Views app (v0.1 · SDK 54)');
     Linking.openURL(`mailto:gamingviewspodcast@gmail.com?subject=${subject}&body=${body}`).catch(() => {});
+  };
+
+  // ADDED (item 36 — in-app review prompt): a plain, always-available way to
+  // rate the app, independent of the quota-limited native prompt in
+  // lib/reviewPrompt.js (that one only fires under a narrow gate and at
+  // most once per app version — this row works every time). Deep-links
+  // straight to each store's own review entry point rather than just the
+  // app's listing page. Android uses the plain https listing link rather
+  // than a market:// URI — reliably opens everywhere (falls back to a
+  // browser if the Play Store app itself isn't installed), matching this
+  // screen's existing links above, which are also plain https with no
+  // canOpenURL/fallback branching.
+  const rateApp = () => {
+    const url = Platform.OS === 'ios'
+      ? 'https://apps.apple.com/app/id6801985905?action=write-review'
+      : 'https://play.google.com/store/apps/details?id=com.gamingviews.app';
+    Linking.openURL(url).catch(() => {});
   };
 
   return (
@@ -89,8 +106,8 @@ export default function SettingsScreen() {
             <Text style={styles.aboutLinkText}>Send Feedback</Text>
             <Text style={styles.chev}>›</Text>
           </Pressable>
-          <Pressable style={[styles.aboutLink, { borderBottomWidth: 0 }]} onPress={() => router.push('/onboarding')}>
-            <Text style={styles.aboutLinkText}>Preview Onboarding</Text>
+          <Pressable style={[styles.aboutLink, { borderBottomWidth: 0 }]} onPress={rateApp}>
+            <Text style={styles.aboutLinkText}>Rate Gaming Views</Text>
             <Text style={styles.chev}>›</Text>
           </Pressable>
         </View>
