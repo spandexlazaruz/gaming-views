@@ -6,6 +6,7 @@ import { colors } from '../../lib/theme';
 import { useGames } from '../../lib/GamesContext';
 import { toDate } from '../../lib/dates';
 import { useWatchlist } from '../../lib/WatchlistContext';
+import { reminderDateFor } from '../../lib/notifications';
 import GameCard from '../../components/GameCard';
 import SwipeableGameCard from '../../components/SwipeableGameCard';
 
@@ -16,10 +17,40 @@ import SwipeableGameCard from '../../components/SwipeableGameCard';
 // default.
 const UNDO_WINDOW_MS = 4000;
 
+// ADDED (item 40 — keep released games visible in Watchlist for 24h): the
+// backend's own games query is forward-looking only (see
+// gaming-views-backend/api/games.js's `where first_release_date > now`) —
+// the instant a game's release date passes, it stops coming back at all.
+// Rather than widening that query (which Calendar, Search, and the hero
+// carousel also depend on staying upcoming-only — see the fuller reasoning
+// in the item 40 commit), this keeps a released game showing here for 24
+// hours past its release date, using the last-known data captured while it
+// was still live (see WatchlistContext's savedGameSnapshots).
+//
+// "Its release date" resolves the exact same way the push notification and
+// weekly digest already do (lib/notifications.js's reminderDateFor, reused
+// here rather than re-deriving this): the specific platform's own date when
+// this title was watchlisted under one, otherwise the game's regular
+// (earliest-platform) date — not a new date-selection rule.
+//
+// Only day-level dates exist anywhere in this app (see lib/dates.js) — IGDB's
+// real release timestamp never reaches the frontend — so "24 hours after
+// release" resolves to "through the entire local calendar day the game
+// releases on," using local midnight of that day as hour zero. Close enough
+// to a real 24-hour window given what data actually exists, and consistent
+// with how every other "days until release" calculation in this app already
+// treats dates.
+const RELEASE_GRACE_WINDOW_MS = 24 * 60 * 60 * 1000;
+function withinReleaseGraceWindow(game, platformContext) {
+  const releaseDate = reminderDateFor(game, platformContext);
+  const elapsedMs = Date.now() - toDate(releaseDate).getTime();
+  return elapsedMs >= 0 && elapsedMs < RELEASE_GRACE_WINDOW_MS;
+}
+
 export default function WatchlistScreen() {
   const router = useRouter();
   const { games } = useGames();
-  const { saved, savedPlatforms, reminders, platformContext, toggleWatchlist, restoreWatchlistEntry } = useWatchlist();
+  const { saved, savedPlatforms, reminders, platformContext, savedGameSnapshots, toggleWatchlist, restoreWatchlistEntry } = useWatchlist();
   // The most recent swipe-removal still within its undo window, or null.
   // Single-slot deliberately — matches how most apps handle this (e.g.
   // Gmail's own archive-undo snackbar): swiping a second card before the
@@ -32,8 +63,21 @@ export default function WatchlistScreen() {
   }, []);
 
   const items = useMemo(
-    () => [...saved].map((t) => games.find((g) => g.title === t)).filter(Boolean).sort((a, b) => toDate(a.date) - toDate(b.date)),
-    [saved, games]
+    () => [...saved]
+      .map((t) => {
+        const live = games.find((g) => g.title === t);
+        if (live) return live;
+        // Not in the live dataset anymore — fall back to the last-known
+        // snapshot for up to 24 hours past its release date (see
+        // withinReleaseGraceWindow above) rather than dropping it the
+        // instant the backend stops returning it.
+        const snapshot = savedGameSnapshots[t];
+        if (!snapshot) return null;
+        return withinReleaseGraceWindow(snapshot, platformContext) ? snapshot : null;
+      })
+      .filter(Boolean)
+      .sort((a, b) => toDate(a.date) - toDate(b.date)),
+    [saved, games, savedGameSnapshots, platformContext]
   );
 
   const handleSwipeRemove = (title) => {
