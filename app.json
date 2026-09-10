@@ -43,7 +43,14 @@
           "organization": "gaming-views"
         }
       ],
-      "expo-notifications"
+      "expo-notifications",
+      [
+        "expo-calendar",
+        {
+          "calendarPermission": "Gaming Views uses your calendar to add a release-date event for games you choose to add.",
+          "remindersPermission": false
+        }
+      ]
     ],
     "extra": {
       "router": {},

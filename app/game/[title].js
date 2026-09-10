@@ -12,6 +12,7 @@ import { LoadingState } from '../../lib/StateViews';
 import { daysUntil, formatDate, formatDateShort, MONTH_NAMES, platformDateGroups } from '../../lib/dates';
 import { useWatchlist, LEAD_OPTIONS } from '../../lib/WatchlistContext';
 import { ensureNotificationPermission } from '../../lib/notifications';
+import { addGameReleaseToCalendar } from '../../lib/calendarEvent';
 import GameCard from '../../components/GameCard';
 import QuickNavBar from '../../components/QuickNavBar';
 
@@ -136,6 +137,11 @@ export default function GameDetailScreen() {
   const { saved, savedPlatforms, toggleWatchlist, reminders, setReminderLead } = useWatchlist();
   const [storePickerOpen, setStorePickerOpen] = useState(false);
   const [storeChecking, setStoreChecking] = useState(false);
+  // ADDED (item 37 — add to calendar): idle | adding | added | denied,
+  // same button-label-swap pattern as storeChecking above and
+  // NotificationsScreen's testState — no native Alert anywhere in this app,
+  // feedback always lives in the button's own text instead.
+  const [calendarState, setCalendarState] = useState('idle');
   // ADDED 2026-08-20 (game detail page enrichment — description/trailer/
   // screenshots, layout locked 2026-08-20): descExpanded/descTruncatable
   // drive the description's "Show more/less" toggle — descTruncatable only
@@ -184,6 +190,7 @@ export default function GameDetailScreen() {
     setDescMeasured(false);
     setTrailerPlaying(false);
     setScreenshotViewerIndex(null);
+    setCalendarState('idle');
   }, [title]);
 
   // ADDED 2026-08-20 (screenshot full-screen rotation): this is the one
@@ -298,6 +305,24 @@ export default function GameDetailScreen() {
     }
   };
 
+  // ADDED (item 37 — add to calendar): resets back to idle after a few
+  // seconds either way, same transient-feedback duration
+  // NotificationsScreen's own test-notification button already uses.
+  const handleAddToCalendar = async () => {
+    if (calendarState === 'adding') return;
+    setCalendarState('adding');
+    const added = await addGameReleaseToCalendar(game);
+    setCalendarState(added ? 'added' : 'denied');
+    setTimeout(() => setCalendarState('idle'), 4000);
+  };
+
+  const calendarBtnLabel = {
+    idle: '📅 ADD TO CALENDAR',
+    adding: 'ADDING…',
+    added: '✅ ADDED TO CALENDAR',
+    denied: "COULDN'T ADD — CHECK CALENDAR PERMISSION",
+  }[calendarState];
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       {FixedHeader}
@@ -361,6 +386,14 @@ export default function GameDetailScreen() {
             <Text style={styles.storeBtnText}>
               {storeChecking ? 'CHECKING…' : '🔗 VIEW IN STORE'}
             </Text>
+          </Pressable>
+
+          <Pressable
+            style={[styles.storeBtn, calendarState === 'adding' && styles.storeBtnDisabled]}
+            onPress={handleAddToCalendar}
+            disabled={calendarState === 'adding'}
+          >
+            <Text style={styles.storeBtnText}>{calendarBtnLabel}</Text>
           </Pressable>
 
           <Pressable
