@@ -39,7 +39,7 @@ export default function SettingsScreen() {
 
   const sendFeedback = () => {
     const subject = encodeURIComponent('Gaming Views Feedback');
-    const body = encodeURIComponent('\n\n—\nSent from the Gaming Views app (v0.1 · SDK 54)');
+    const body = encodeURIComponent('\n\n—\nSent from the Gaming Views app (v0.2 · SDK 54)');
     Linking.openURL(`mailto:gamingviewspodcast@gmail.com?subject=${subject}&body=${body}`).catch(() => {});
   };
 
@@ -91,7 +91,7 @@ export default function SettingsScreen() {
         <Text style={[styles.sectionHead, { marginTop: 26 }]}>ABOUT</Text>
         <View style={styles.aboutBlock}>
           <Text style={styles.appName}>Gaming Views</Text>
-          <Text style={styles.appVer}>v0.1 · SDK 54</Text>
+          <Text style={styles.appVer}>v0.2 · SDK 54</Text>
         </View>
         <View style={styles.aboutLinks}>
           <Pressable style={styles.aboutLink} onPress={() => Linking.openURL('https://spandexlazaruz.github.io/gaming-views/privacy-policy.html').catch(() => {})}>

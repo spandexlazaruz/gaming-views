@@ -15,7 +15,7 @@ module.exports = {
     name: IS_DEV ? 'Gaming Views Dev' : 'Gaming Views',
     slug: 'gaming-views',
     scheme: 'gamingviews',
-    version: '0.1.0',
+    version: '0.2.0',
     orientation: 'default',
     icon: IS_DEV ? './assets/icon-dev.png' : './assets/icon.png',
     userInterfaceStyle: 'dark',
