@@ -7,7 +7,7 @@ import * as ScreenOrientation from 'expo-screen-orientation';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { colors, PLATFORMS, posterThemes, hashStr } from '../../lib/theme';
 import { STORE_LABELS, resolveStoreUrl } from '../../lib/stores';
-import { useGames } from '../../lib/GamesContext';
+import { useGames, useLastMonthGames } from '../../lib/GamesContext';
 import { LoadingState } from '../../lib/StateViews';
 import { daysUntil, formatDate, formatDateShort, MONTH_NAMES, platformDateGroups } from '../../lib/dates';
 import { useWatchlist, LEAD_OPTIONS } from '../../lib/WatchlistContext';
@@ -192,7 +192,25 @@ export default function GameDetailScreen() {
   const screenshotViewerOpen = screenshotViewerIndex !== null;
   const screenshotScrollRef = useRef(null);
 
-  const game = games.find((g) => g.title === decodeURIComponent(title));
+  // FIXED (item 42 — "What You Missed" games opening as "Game not found"):
+  // `games` (useGames()) is upcoming-only — the backend's own
+  // forward-looking query contract (see gaming-views-backend/api/games.js)
+  // — same array Calendar/Watchlist/Search all read. An already-released
+  // title, only reachable today via "What You Missed" (see
+  // app/what-you-missed.js, which navigates here with nothing but the
+  // title string, same as GameCard's own router.push everywhere else — not
+  // a title-matching or encoding bug), can never be in it, so this looks
+  // there first and only falls back to the same last-month dataset that
+  // screen fetches (useLastMonthGames, ?when=last-month) once the primary
+  // lookup has genuinely finished and failed — not eagerly on every visit,
+  // since the overwhelmingly common case (opening from Calendar/Watchlist/
+  // Search) always resolves immediately above with no need for this at all.
+  const decodedTitle = decodeURIComponent(title);
+  const primaryGame = games.find((g) => g.title === decodedTitle);
+  const needsLastMonthFallback = !loading && !primaryGame;
+  const { games: lastMonthGames, loading: lastMonthLoading } = useLastMonthGames({ enabled: needsLastMonthFallback });
+  const game = primaryGame || (needsLastMonthFallback ? lastMonthGames.find((g) => g.title === decodedTitle) : undefined);
+  const stillResolving = loading || (needsLastMonthFallback && lastMonthLoading);
 
   useEffect(() => {
     setDescExpanded(false);
@@ -242,7 +260,7 @@ export default function GameDetailScreen() {
     </View>
   );
 
-  if (loading) {
+  if (stillResolving) {
     return (
       <SafeAreaView style={styles.container} edges={['top']}>
         {FixedHeader}
