@@ -70,7 +70,16 @@ const styles = StyleSheet.create({
     width: 34, height: 34, borderRadius: 9, backgroundColor: colors.bgCard,
     alignItems: 'center', justifyContent: 'center',
   },
-  backBtnText: { color: colors.white, fontSize: 18 },
+  // FIXED (Android back-arrow vertical centering) — see app/accounts.js's
+  // matching comment for the full story: same real prior fix (commit
+  // 2bd96a4b, "Detail Nav Fix"), only ever applied to app/game/[title].js
+  // before now, propagated here since this screen shares the identical
+  // container/glyph/font-size pattern.
+  backBtnText: {
+    color: colors.white, fontSize: 18, lineHeight: 20,
+    textAlignVertical: 'center', includeFontPadding: false,
+    marginTop: -1,
+  },
   title: { fontFamily: 'Poppins_700Bold', fontSize: 15, color: colors.white },
   subtitle: { fontSize: 11.5, color: colors.mutedDim, marginTop: 2, fontFamily: 'Inter_500Medium' },
   cardWrap: { paddingHorizontal: 16 },

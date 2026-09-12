@@ -90,7 +90,22 @@ const styles = StyleSheet.create({
     width: 34, height: 34, borderRadius: 9, backgroundColor: colors.bgCard,
     alignItems: 'center', justifyContent: 'center',
   },
-  backBtnText: { color: colors.white, fontSize: 18 },
+  // FIXED (Android back-arrow vertical centering): the "←" glyph rendered
+  // compressed and sat toward the bottom of its button on Android — never
+  // an iOS issue, since textAlignVertical/includeFontPadding are Android-
+  // only RN style props that iOS silently ignores. The real prior fix for
+  // this (commit 2bd96a4b, "Detail Nav Fix") was only ever applied to
+  // app/game/[title].js's own back button — this screen shares the exact
+  // same container size/glyph/font-size but never got the matching text
+  // fix, so Android's default font-metrics padding around the glyph was
+  // still uncorrected here. Same values, confirmed already safe on iOS
+  // (that screen's identical fix has shipped for weeks with no regression
+  // reported) since textAlignVertical/includeFontPadding do nothing there.
+  backBtnText: {
+    color: colors.white, fontSize: 18, lineHeight: 20,
+    textAlignVertical: 'center', includeFontPadding: false,
+    marginTop: -1,
+  },
   title: { fontFamily: 'Poppins_700Bold', fontSize: 15, color: colors.white },
   body: { padding: 16, paddingBottom: 60 },
   intro: { fontSize: 13, color: colors.muted, lineHeight: 19, marginBottom: 16 },
