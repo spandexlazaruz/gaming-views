@@ -217,6 +217,25 @@ export default function CalendarScreen() {
     );
   }
 
+  // ADDED (item 29 follow-up — fixed alphabetical tiebreak): GameCard's
+  // singular highlightPlatform feeds its own save-toggle (toggleWatchlist)
+  // and its card-tap navigation's ?platform= query param, which the detail
+  // screen then reads as arrivedPlatform for its own "ADD TO WATCHLIST" CTA
+  // (see app/game/[title].js) — both paths are downstream of this one
+  // value, not independently derived, so fixing it here keeps them
+  // necessarily consistent rather than needing a second fix elsewhere.
+  // With 2+ platforms active there's no longer one obvious platform to
+  // attribute a save/navigation to — Dan's decision: a fixed alphabetical
+  // tiebreak among the currently active platforms (real keys, confirmed
+  // against lib/theme.js's PLATFORMS: 'pc', 'ps', 'switch', 'xbox' — plain
+  // default string sort is safe, all lowercase ASCII words, no digits/mixed
+  // case to trip it up). Sorting a 1-element array is a no-op, so this
+  // naturally also covers the "exactly one active" case identically to
+  // before this whole feature — only the 2+ case actually changes anything.
+  const cardHighlightPlatform = activePlatforms.length === 0
+    ? undefined
+    : [...activePlatforms].sort()[0];
+
   const ListHeader = (
     <>
       <HeroCarousel
@@ -311,17 +330,17 @@ export default function CalendarScreen() {
         keyExtractor={(item) => item.title}
         renderItem={({ item }) => (
           <View style={styles.cardWrap}>
-            {/* UPDATED (item 29, multi-select): highlightPlatform (singular)
-                stays exactly as it was — only passed when exactly one
-                platform is active, so isSaved/the single-platform
-                date/the corner badge/the detail-page navigation and
-                watchlist-toggle behavior are all completely unchanged for
-                that case. highlightPlatforms (plural) is new, and only
-                actually does anything inside GameCard once 2+ platforms are
-                active — see its own comment there. */}
+            {/* UPDATED (item 29, multi-select + follow-up): highlightPlatform
+                (singular) is 0/1-active unchanged, alphabetically-tiebroken
+                for 2+ (see cardHighlightPlatform above) — isSaved/the
+                single-platform date/the corner badge/the detail-page
+                navigation and watchlist-toggle all read this one value.
+                highlightPlatforms (plural) is separate, and only actually
+                does anything inside GameCard once 2+ platforms are active —
+                see its own comment there. */}
             <GameCard
               game={item}
-              highlightPlatform={activePlatforms.length === 1 ? activePlatforms[0] : undefined}
+              highlightPlatform={cardHighlightPlatform}
               highlightPlatforms={activePlatforms.length > 0 ? activePlatforms : undefined}
             />
           </View>
