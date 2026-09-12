@@ -57,7 +57,7 @@ function pickRecommended(games) {
 export default function CalendarScreen() {
   const router = useRouter();
   const { games, loading, error, refetch } = useGames();
-  const { saved, toggleWatchlist, preferredPlatform, preferredGenre, hydrated } = useWatchlist();
+  const { saved, toggleWatchlist, preferredPlatforms, preferredGenres, hydrated } = useWatchlist();
   // FIXED 2026-09-08, revised 2026-09-08 (item 29): the previous attempt
   // seeded activePlatform/activeGenre via an effect keyed only on
   // `hydrated`, assuming this screen would either mount fresh after
@@ -65,40 +65,45 @@ export default function CalendarScreen() {
   // Neither holds: app/_layout.js's Stack always mounts `(tabs)` (and this
   // screen) immediately on launch, and only redirects to `/onboarding`
   // afterward once the `hasOnboarded` check resolves — so by the time
-  // onboarding calls setPreferredPlatform/setPreferredGenre and navigates
+  // onboarding calls setPreferredPlatforms/setPreferredGenres and navigates
   // back via router.replace('/(tabs)'), it's returning to this SAME
   // already-mounted instance, not a fresh one. `hydrated` had already
   // flipped true long before onboarding ever ran, so the old effect's only
   // trigger never fired again — the onboarding pick was silently dropped
   // every time, on both a genuine restart and the in-app preview flow.
   //
-  // Fixed by also depending on preferredPlatform/preferredGenre themselves,
-  // so a later change to either (onboarding finishing, while this screen
-  // was already sitting there) re-applies too — guarded so it never
-  // clobbers the user's own chip taps once they've made one.
+  // Fixed by also depending on preferredPlatforms/preferredGenres
+  // themselves, so a later change to either (onboarding finishing, while
+  // this screen was already sitting there) re-applies too — guarded so it
+  // never clobbers the user's own chip taps once they've made one.
   //
   // FIXED 2026-09-08 (later, same day): that guard used to be a single
   // shared userTouchedFilters ref checked by both setState calls below —
   // meaning a manual tap on EITHER chip disabled auto-seeding for BOTH
   // dimensions for the rest of the session, not just the one actually
-  // touched. Concretely: onboarding sets only one of
-  // preferredPlatform/preferredGenre when the other was a multi-pick (see
-  // onboarding.js's finish() — no filter for 2+ selections, by design), so
-  // the seeding effect still needs to apply the OTHER, validly-single-picked
-  // one on its own — but if the Calendar's own platform or genre chip row
-  // got tapped at any point first (even just poking at the UI), the shared
-  // ref would silently block that still-pending, still-valid seed too,
-  // reading as if it had never worked. Split into two independent refs, one
-  // per dimension, so a manual override on one can never veto the other.
-  const [activePlatform, setActivePlatform] = useState('all');
-  const [activeGenre, setActiveGenre] = useState('all');
+  // touched. Split into two independent refs, one per dimension, so a
+  // manual override on one can never veto the other. Confirmed correct via
+  // a real on-device diagnostic pass (item 29) — untouched by the
+  // multi-select rework below beyond seeding from arrays instead of single
+  // values, since arrays made the old single-vs-multi-pick asymmetry this
+  // was originally guarding against moot: onboarding now always turns
+  // whatever was picked into a real filter (see onboarding.js's finish()),
+  // not just the exactly-one case.
+  //
+  // UPDATED (item 29, multi-select): activePlatform/activeGenre were a
+  // single string each ('all' meaning no filter). Now arrays —
+  // activePlatforms/activeGenres — with an empty array as the new "no
+  // filter", so more than one platform/genre can be active at once, same
+  // as preferredPlatforms/preferredGenres above.
+  const [activePlatforms, setActivePlatforms] = useState([]);
+  const [activeGenres, setActiveGenres] = useState([]);
   const userTouchedPlatform = useRef(false);
   const userTouchedGenre = useRef(false);
   useEffect(() => {
     if (!hydrated) return;
-    if (!userTouchedPlatform.current) setActivePlatform(preferredPlatform);
-    if (!userTouchedGenre.current) setActiveGenre(preferredGenre);
-  }, [hydrated, preferredPlatform, preferredGenre]);
+    if (!userTouchedPlatform.current) setActivePlatforms(preferredPlatforms);
+    if (!userTouchedGenre.current) setActiveGenres(preferredGenres);
+  }, [hydrated, preferredPlatforms, preferredGenres]);
   // No "preferred month" concept, unlike platform/genre — the whole point of
   // this filter is a rolling window that shifts day to day, so there's
   // nothing sensible to persist as a default. Always starts on "All Months".
@@ -130,23 +135,31 @@ export default function CalendarScreen() {
   // Resolves to the same `g.date` as before whenever activePlatform is
   // 'all' or the game has no per-platform breakdown — no behavior change
   // for the common case.
+  // UPDATED (item 29, multi-select): activePlatform === 'all' equality
+  // becomes activePlatforms.length === 0 (no filter); the single-key
+  // `g.platforms.includes(activePlatform)` check becomes a membership/OR
+  // check — a game matches if it ships on ANY of the active platforms, not
+  // all of them (mirrors preferredPlatforms/preferredGenres' own "filter to
+  // whatever was picked" semantics). Genre stays a single string per game
+  // (g.genreCategory — confirmed against the real backend response, not
+  // assumed) so its own membership check is `activeGenres.includes(...)`
+  // rather than an array-to-array comparison.
   const filtered = useMemo(
     () => visibleGames.filter((g) => {
-      const platformFilter = activePlatform !== 'all' ? activePlatform : null;
-      const d = effectiveDate(g, platformFilter);
+      const d = effectiveDate(g, activePlatforms.length > 0 ? activePlatforms : null);
       return (
-        (activePlatform === 'all' || g.platforms.includes(activePlatform)) &&
-        (activeGenre === 'all' || g.genreCategory === activeGenre) &&
+        (activePlatforms.length === 0 || g.platforms.some((p) => activePlatforms.includes(p))) &&
+        (activeGenres.length === 0 || activeGenres.includes(g.genreCategory)) &&
         (activeMonth === 'all' || `${d[0]}-${d[1]}` === activeMonth)
       );
     }),
-    [visibleGames, activePlatform, activeGenre, activeMonth]
+    [visibleGames, activePlatforms, activeGenres, activeMonth]
   );
 
   // SectionList wants { title, data } per section instead of the { label, games }
   // shape we used with plain arrays — same grouping logic, different output shape.
   const sections = useMemo(() => {
-    const platformFilter = activePlatform !== 'all' ? activePlatform : null;
+    const platformFilter = activePlatforms.length > 0 ? activePlatforms : null;
     const byMonth = {};
     filtered.forEach((g) => {
       const d = effectiveDate(g, platformFilter);
@@ -165,7 +178,7 @@ export default function CalendarScreen() {
           data: entries.sort((a, b) => a.sortDate[2] - b.sortDate[2]).map((e) => e.game),
         };
       });
-  }, [filtered, activePlatform]);
+  }, [filtered, activePlatforms]);
 
   const platformChips = [{ key: 'all', label: 'All' }, ...Object.entries(PLATFORMS).map(([k, v]) => ({ key: k, label: v.label }))];
   const genreChips = [{ key: 'all', label: 'All Genres' }, ...GENRES.map((g) => ({ key: g, label: g }))];
@@ -224,28 +237,50 @@ export default function CalendarScreen() {
         <Text style={styles.missedRowChev}>›</Text>
       </Pressable>
 
+      {/* UPDATED (item 29, multi-select): tapping "All" clears the active
+          set back to empty; tapping any specific chip toggles it in/out of
+          the set (so "All" implicitly deselects the moment any specific
+          chip is active, and vice versa — there's no in-between state where
+          both read as active). Same toggle-multi-select interaction
+          onboarding's own platform/genre pickers already use. */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filters} contentContainerStyle={{ gap: 8, paddingHorizontal: 16 }}>
-        {platformChips.map((c) => (
-          <Pressable
-            key={c.key}
-            onPress={() => { userTouchedPlatform.current = true; setActivePlatform(c.key); }}
-            style={[styles.chip, activePlatform === c.key && styles.chipActive]}
-          >
-            <Text style={[styles.chipText, activePlatform === c.key && styles.chipTextActive]}>{c.label}</Text>
-          </Pressable>
-        ))}
+        {platformChips.map((c) => {
+          const isAll = c.key === 'all';
+          const isActive = isAll ? activePlatforms.length === 0 : activePlatforms.includes(c.key);
+          return (
+            <Pressable
+              key={c.key}
+              onPress={() => {
+                userTouchedPlatform.current = true;
+                if (isAll) setActivePlatforms([]);
+                else setActivePlatforms((prev) => (prev.includes(c.key) ? prev.filter((k) => k !== c.key) : [...prev, c.key]));
+              }}
+              style={[styles.chip, isActive && styles.chipActive]}
+            >
+              <Text style={[styles.chipText, isActive && styles.chipTextActive]}>{c.label}</Text>
+            </Pressable>
+          );
+        })}
       </ScrollView>
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filtersSecondary} contentContainerStyle={{ gap: 8, paddingHorizontal: 16 }}>
-        {genreChips.map((c) => (
-          <Pressable
-            key={c.key}
-            onPress={() => { userTouchedGenre.current = true; setActiveGenre(c.key); }}
-            style={[styles.genreChip, activeGenre === c.key && styles.genreChipActive]}
-          >
-            <Text style={[styles.genreChipText, activeGenre === c.key && styles.genreChipTextActive]}>{c.label}</Text>
-          </Pressable>
-        ))}
+        {genreChips.map((c) => {
+          const isAll = c.key === 'all';
+          const isActive = isAll ? activeGenres.length === 0 : activeGenres.includes(c.key);
+          return (
+            <Pressable
+              key={c.key}
+              onPress={() => {
+                userTouchedGenre.current = true;
+                if (isAll) setActiveGenres([]);
+                else setActiveGenres((prev) => (prev.includes(c.key) ? prev.filter((k) => k !== c.key) : [...prev, c.key]));
+              }}
+              style={[styles.genreChip, isActive && styles.genreChipActive]}
+            >
+              <Text style={[styles.genreChipText, isActive && styles.genreChipTextActive]}>{c.label}</Text>
+            </Pressable>
+          );
+        })}
       </ScrollView>
 
       {monthChips.length > 1 && (
@@ -276,9 +311,18 @@ export default function CalendarScreen() {
         keyExtractor={(item) => item.title}
         renderItem={({ item }) => (
           <View style={styles.cardWrap}>
+            {/* UPDATED (item 29, multi-select): highlightPlatform (singular)
+                stays exactly as it was — only passed when exactly one
+                platform is active, so isSaved/the single-platform
+                date/the corner badge/the detail-page navigation and
+                watchlist-toggle behavior are all completely unchanged for
+                that case. highlightPlatforms (plural) is new, and only
+                actually does anything inside GameCard once 2+ platforms are
+                active — see its own comment there. */}
             <GameCard
               game={item}
-              highlightPlatform={activePlatform !== 'all' ? activePlatform : undefined}
+              highlightPlatform={activePlatforms.length === 1 ? activePlatforms[0] : undefined}
+              highlightPlatforms={activePlatforms.length > 0 ? activePlatforms : undefined}
             />
           </View>
         )}

@@ -9,9 +9,18 @@ import { ensureNotificationPermission } from '../lib/notifications';
 
 const STEPS = ['welcome', 'platforms', 'genres', 'notifications', 'done'];
 
+// ADDED (item 29, multi-select): "PS5", "PS5 and Xbox", "PS5, Xbox, and PC" —
+// used by the "done" step's summary below to name however many
+// platforms/genres were actually picked, not just the single-pick case.
+function joinNaturally(items) {
+  if (items.length === 1) return items[0];
+  if (items.length === 2) return `${items[0]} and ${items[1]}`;
+  return `${items.slice(0, -1).join(', ')}, and ${items[items.length - 1]}`;
+}
+
 export default function OnboardingScreen() {
   const router = useRouter();
-  const { setPreferredPlatform, setPreferredGenre } = useWatchlist();
+  const { setPreferredPlatforms, setPreferredGenres } = useWatchlist();
   const [step, setStep] = useState(0);
   const [selected, setSelected] = useState(new Set());
   const [selectedGenres, setSelectedGenres] = useState(new Set());
@@ -32,13 +41,17 @@ export default function OnboardingScreen() {
     });
   };
 
+  // FIXED (item 29, multi-select): used to only ever turn a pick into a
+  // real filter when exactly one platform/genre was selected — 2+ picks
+  // silently applied no filter at all, discarding the choice entirely (the
+  // "You're all set" summary below acknowledged a multi-pick, but nothing
+  // was actually ever filtered by it). WatchlistContext's
+  // preferredPlatforms/preferredGenres are plain arrays now (see its own
+  // comment), so whatever was actually picked — none, one, or several —
+  // becomes the real filter, no size check needed at all.
   const finish = () => {
-    if (selected.size === 1) {
-      setPreferredPlatform([...selected][0]);
-    }
-    if (selectedGenres.size === 1) {
-      setPreferredGenre([...selectedGenres][0]);
-    }
+    setPreferredPlatforms([...selected]);
+    setPreferredGenres([...selectedGenres]);
     // Fire-and-forget — never let a storage hiccup block navigation.
     AsyncStorage.setItem('hasOnboarded', 'true').catch(() => {});
     router.replace('/(tabs)');
@@ -153,36 +166,20 @@ export default function OnboardingScreen() {
             <Text style={styles.title}>You're all set</Text>
             <Text style={styles.sub}>
               {(() => {
-                // FIXED 2026-09-08, extended same day: this used to only
-                // ever acknowledge a platform or genre pick when exactly one
-                // of each was selected, matching finish()'s own real
-                // filtering behavior below (see its comment) for both —
-                // but picking 2+ of either silently fell through to generic
-                // copy, reading as if those picks were ignored rather than
-                // deliberately not turned into a single filter (both
-                // pickers' framing on the previous screens is singular:
-                // "what do you play on" / "pick a genre to lead with").
-                // No change to what's actually filtered here — 2+ of either
-                // still applies no filter for that dimension, exactly as
-                // before — this just stops the summary from misrepresenting
-                // a multi-pick as if nothing had been chosen. Deliberately
-                // not enumerating every one of the resulting combinations
-                // with fully bespoke copy — platCount/genreCount each being
-                // 0/1/2+ is 9 cases, and most of them read fine sharing one
-                // of a few honest phrasings rather than needing a unique
-                // sentence apiece.
-                const platCount = selected.size;
-                const platBit = platCount === 1 ? PLATFORMS[[...selected][0]].full : null;
-                const genreCount = selectedGenres.size;
-                const genreBit = genreCount === 1 ? [...selectedGenres][0] : null;
+                // FIXED (item 29, multi-select): finish() now turns every
+                // pick — 0, 1, or several — into a real filter (see its own
+                // comment), so this summary no longer needs the old
+                // "acknowledge the pick but admit it's not actually
+                // filtering" branches for 2+ selections — a multi-pick IS
+                // the filter now, same shape as a single pick, just naming
+                // more than one thing.
+                const platNames = [...selected].map((k) => PLATFORMS[k].full);
+                const genreNames = [...selectedGenres];
+                const platBit = platNames.length > 0 ? joinNaturally(platNames) : null;
+                const genreBit = genreNames.length > 0 ? joinNaturally(genreNames) : null;
                 if (platBit && genreBit) return `Showing ${genreBit} releases on ${platBit} first. You can change this anytime.`;
-                if (platBit && genreCount > 1) return `Showing ${platBit} releases first, across all your picked genres. You can change this anytime.`;
-                if (genreBit && platCount > 1) return `Showing ${genreBit} releases first, across all your picked platforms. You can change this anytime.`;
                 if (platBit) return `Showing ${platBit} releases first. You can change this anytime.`;
                 if (genreBit) return `Showing ${genreBit} releases first. You can change this anytime.`;
-                if (platCount > 1 && genreCount > 1) return "Good picks — we'll show every upcoming release for now since you picked a few platforms and genres. You can filter anytime.";
-                if (platCount > 1) return "Good picks — we'll show every upcoming release for now since you picked a few platforms. You can filter anytime.";
-                if (genreCount > 1) return "Good picks — we'll show every upcoming release for now since you picked a few genres. You can filter anytime.";
                 return "You're seeing every upcoming release. You can filter anytime.";
               })()}
             </Text>

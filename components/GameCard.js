@@ -3,7 +3,7 @@ import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { colors, PLATFORMS, posterThemes, hashStr } from '../lib/theme';
-import { daysUntil, formatDateShort, platformDateGroups } from '../lib/dates';
+import { daysUntil, effectiveDate, formatDateShort, platformDateGroups } from '../lib/dates';
 import { useWatchlist, LEAD_OPTIONS } from '../lib/WatchlistContext';
 import { wasRecentlySwiped } from '../lib/recentSwipes';
 
@@ -13,18 +13,33 @@ import { wasRecentlySwiped } from '../lib/recentSwipes';
 // PS5 and Xbox separately" read as one card with two badges, matching how
 // it was explicitly asked for, rather than either losing one platform or
 // splitting into two cards.
-export default function GameCard({ game, highlightPlatform, showReminder, multiPlatformBadges }) {
+// `highlightPlatforms` (item 29, multi-select) — the Calendar's full active
+// platform selection, only actually used here once it holds 2+ entries
+// (the exactly-one case is already fully covered by highlightPlatform
+// above and left completely alone — Calendar only ever passes
+// highlightPlatform when exactly one platform is active, see its own
+// comment). Drives the date/badge/dot logic below for "which of this
+// game's platforms/dates are actually relevant to what's being browsed
+// right now", the same job highlightPlatform already does for the
+// single-platform case, just for a set instead of one key.
+export default function GameCard({ game, highlightPlatform, highlightPlatforms, showReminder, multiPlatformBadges }) {
   const router = useRouter();
   const { saved, savedPlatforms, toggleWatchlist, reminders } = useWatchlist();
   const titleSavedPlatforms = savedPlatforms[game.title] || [];
+  const multiHighlight = highlightPlatforms && highlightPlatforms.length > 1 ? highlightPlatforms : null;
   // Filtered to a specific platform (e.g. the Calendar's active platform
   // chip) → only that platform's own saved state counts, so a game saved on
   // Xbox doesn't read as saved while browsing/filtering PS5 for the same
   // game, and vice versa. No filter in context → falls back to "saved for
-  // anything", same as before.
+  // anything", same as before. Multiple active platforms → saved for ANY of
+  // them counts, same membership/OR semantics as Calendar's own filtering
+  // (see app/(tabs)/index.js's `filtered`) — there's no one specific
+  // platform to require it be saved under here.
   const isSaved = highlightPlatform
     ? titleSavedPlatforms.includes(highlightPlatform)
-    : titleSavedPlatforms.length > 0;
+    : multiHighlight
+      ? titleSavedPlatforms.some((p) => multiHighlight.includes(p))
+      : titleSavedPlatforms.length > 0;
   // Only meaningful for saved games — showReminder is currently only passed
   // from the Watchlist screen, where every card is saved by definition, but
   // guarding on isSaved keeps this safe if it's ever reused elsewhere.
@@ -32,18 +47,26 @@ export default function GameCard({ game, highlightPlatform, showReminder, multiP
     ? (LEAD_OPTIONS.find((o) => o.key === (reminders[game.title] || 'release_day')) || LEAD_OPTIONS[0]).label
     : null;
   const theme = posterThemes[hashStr(game.title) % posterThemes.length];
-  // A filtered platform with its own confirmed date uses that date; a game
-  // with genuinely differing per-platform dates but no active filter shows
-  // its full breakdown below instead (dateGroups) rather than one date that
-  // wouldn't be accurate for every platform on the card.
-  const displayDate = (highlightPlatform && game.platformDates && game.platformDates[highlightPlatform])
-    || game.date;
+  // A filtered platform (or set of them) with its own confirmed date uses
+  // the earliest of those; a game with genuinely differing per-platform
+  // dates but no active filter (or 2+ active platforms that themselves
+  // differ) shows its full breakdown below instead (dateGroups) rather than
+  // one date that wouldn't be accurate for every relevant platform on the
+  // card. effectiveDate already handles a single key, an array, or nothing
+  // (see lib/dates.js) — highlightPlatform takes priority when set (the
+  // unchanged single-platform case), multiHighlight otherwise.
+  const displayDate = effectiveDate(game, highlightPlatform || multiHighlight);
   const days = daysUntil(displayDate);
-  const dateGroups = !highlightPlatform ? platformDateGroups(game) : null;
+  const dateGroups = multiHighlight
+    ? platformDateGroups(game, multiHighlight)
+    : (!highlightPlatform ? platformDateGroups(game) : null);
 
   let badgePlatforms;
   if (highlightPlatform && game.platforms.includes(highlightPlatform)) {
     badgePlatforms = [highlightPlatform];
+  } else if (multiHighlight) {
+    const matching = game.platforms.filter((p) => multiHighlight.includes(p));
+    badgePlatforms = matching.length > 0 ? matching : [game.platforms[0]];
   } else if (multiPlatformBadges && titleSavedPlatforms.length > 0) {
     const valid = titleSavedPlatforms.filter((p) => game.platforms.includes(p));
     badgePlatforms = valid.length > 0 ? valid : [game.platforms[0]];
@@ -66,7 +89,16 @@ export default function GameCard({ game, highlightPlatform, showReminder, multiP
   // case; every other case (not yet saved, or no multiPlatformBadges context)
   // keeps showing the full release-platform list as before.
   let dotPlatforms = game.platforms;
-  if (multiPlatformBadges && isSaved) {
+  // ADDED (item 29, multi-select): when 2+ platforms are actively selected
+  // (e.g. Calendar filtered to PS5 + Xbox), the dots should only ever show
+  // which of THOSE the game actually matches — showing every platform it
+  // ships on (including ones outside the active filter) would misrepresent
+  // what's actually being browsed right now, the same reasoning the
+  // multiPlatformBadges case below already applies for a different reason.
+  if (multiHighlight) {
+    const matching = game.platforms.filter((p) => multiHighlight.includes(p));
+    if (matching.length > 0) dotPlatforms = matching;
+  } else if (multiPlatformBadges && isSaved) {
     const savedOnly = game.platforms.filter((p) => titleSavedPlatforms.includes(p));
     if (savedOnly.length > 0) dotPlatforms = savedOnly;
   }
