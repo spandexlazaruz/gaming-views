@@ -2,30 +2,31 @@ import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { colors } from '../lib/theme';
-import { scrollCalendarToTop } from '../lib/calendarScrollRef';
+import { scrollToTop } from '../lib/topBarScrollRefs';
 
-// ADDED (Phase 3E — tap logo to go home/scroll to top): `route` is passed
-// through from app/(tabs)/_layout.js's header render function — the only
-// signal anywhere in the app for "which tab is this header currently for"
-// (route.name is 'index' for Calendar, 'watchlist' for Watchlist). Tapping
-// the wordmark from Watchlist navigates to Calendar via router.push('/'),
-// matching the exact existing pattern already used for this elsewhere (see
-// app/(tabs)/watchlist.js's own "Browse Upcoming Releases" empty-state
-// button) rather than inventing a new one. Tapping it while already on
-// Calendar scrolls that screen's own list to the top instead — see
-// lib/calendarScrollRef.js for why this needs a small shared module rather
-// than a direct ref (TopBar and Calendar are siblings in the navigation
-// tree, not parent/child).
+// ADDED (Phase 3E — tap logo scrolls the current screen to its own top):
+// `route` is passed through from app/(tabs)/_layout.js's header render
+// function — the only signal anywhere in the app for "which tab is this
+// header currently for" (route.name is 'index' for Calendar, 'watchlist'
+// for Watchlist — TopBar is only ever rendered for these two).
+//
+// UPDATED (real on-device follow-up): this used to navigate to Calendar
+// via router.push('/') when tapped from Watchlist, and only scroll-to-top
+// on Calendar itself — a leftover from when the spec assumed the logo
+// would eventually appear on other, non-list screens too (Search,
+// Settings, the detail page). It doesn't (confirmed when this was first
+// built — TopBar is only ever wired up for Calendar/Watchlist), so with
+// both of the screens that actually have this logo being list screens,
+// Dan's correction was to make it always scroll-to-top, never navigate
+// away — removed the navigate branch outright rather than leave it as
+// unreachable dead code. If the logo's ever extended to a non-list screen
+// later, navigating from there back to Calendar would need reintroducing
+// then, not kept around unused now.
 export default function TopBar({ route }) {
   const router = useRouter();
-  const isOnCalendar = route?.name === 'index';
 
   const handleLogoPress = () => {
-    if (isOnCalendar) {
-      scrollCalendarToTop();
-    } else {
-      router.push('/');
-    }
+    scrollToTop(route?.name);
   };
 
   return (

@@ -6,7 +6,7 @@ import { useGames } from '../../lib/GamesContext';
 import { LoadingState, ErrorState } from '../../lib/StateViews';
 import { daysUntil, MONTH_NAMES, effectiveDate } from '../../lib/dates';
 import { useWatchlist } from '../../lib/WatchlistContext';
-import { registerCalendarListRef } from '../../lib/calendarScrollRef';
+import { registerScrollRef } from '../../lib/topBarScrollRefs';
 import GameCard from '../../components/GameCard';
 import HeroCarousel from '../../components/HeroCarousel';
 
@@ -113,11 +113,14 @@ export default function CalendarScreen() {
   // TopBar (a sibling in the navigation tree, rendered by the Tabs
   // navigator as this screen's own header — see components/TopBar.js) can
   // trigger a scroll-to-top without needing a direct reference to this
-  // screen's SectionList. See lib/calendarScrollRef.js for why this is a
-  // plain shared module rather than a Context provider.
+  // screen's SectionList. See lib/topBarScrollRefs.js for why this is a
+  // plain shared module rather than a Context provider, and for the real
+  // scroll-to-top mechanism itself (getScrollResponder, not scrollToLocation
+  // — see that file's comment for why the latter doesn't reach true offset
+  // 0 past this screen's own ListHeaderComponent).
   const listRef = useRef(null);
   useEffect(() => {
-    registerCalendarListRef(listRef);
+    registerScrollRef('index', listRef);
   }, []);
 
   // Games shown on the Calendar screen exclude anything already on the

@@ -7,6 +7,7 @@ import { useGames } from '../../lib/GamesContext';
 import { toDate } from '../../lib/dates';
 import { useWatchlist } from '../../lib/WatchlistContext';
 import { reminderDateFor } from '../../lib/notifications';
+import { registerScrollRef } from '../../lib/topBarScrollRefs';
 import GameCard from '../../components/GameCard';
 import SwipeableGameCard from '../../components/SwipeableGameCard';
 
@@ -60,6 +61,16 @@ export default function WatchlistScreen() {
 
   useEffect(() => () => {
     if (undoTimer.current) clearTimeout(undoTimer.current);
+  }, []);
+
+  // ADDED (Phase 3E follow-up — tap logo scrolls the current screen to its
+  // own top): registered once so TopBar (a sibling in the navigation tree,
+  // rendered by the Tabs navigator as this screen's own header — see
+  // components/TopBar.js) can trigger a scroll-to-top without a direct
+  // reference to this screen's FlatList. See lib/topBarScrollRefs.js.
+  const listRef = useRef(null);
+  useEffect(() => {
+    registerScrollRef('watchlist', listRef);
   }, []);
 
   const items = useMemo(
@@ -128,6 +139,7 @@ export default function WatchlistScreen() {
         </View>
       ) : (
         <FlatList
+          ref={listRef}
           data={items}
           keyExtractor={(item) => item.title}
           renderItem={({ item }) => (
