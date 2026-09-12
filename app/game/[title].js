@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ScreenOrientation from 'expo-screen-orientation';
+import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { colors, PLATFORMS, posterThemes, hashStr } from '../../lib/theme';
 import { STORE_LABELS, resolveStoreUrl } from '../../lib/stores';
@@ -255,7 +256,7 @@ export default function GameDetailScreen() {
   const FixedHeader = (
     <View style={styles.headerBar}>
       <Pressable style={styles.headerBtn} onPress={() => router.back()} hitSlop={8}>
-        <Text style={styles.headerBtnText}>←</Text>
+        <Ionicons name="arrow-back" size={22} color={colors.white} />
       </Pressable>
     </View>
   );
@@ -832,11 +833,6 @@ const styles = StyleSheet.create({
     width: 34, height: 34, borderRadius: 9, backgroundColor: colors.bgCard,
     borderWidth: 1, borderColor: colors.line,
     alignItems: 'center', justifyContent: 'center',
-  },
-  headerBtnText: {
-    color: colors.white, fontSize: 18, lineHeight: 20,
-    textAlignVertical: 'center', includeFontPadding: false,
-    marginTop: -1,
   },
   heroPoster: {
     width: '100%', aspectRatio: 4 / 3, justifyContent: 'flex-end', padding: 20,

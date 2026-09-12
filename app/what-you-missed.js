@@ -1,6 +1,7 @@
 import { View, Text, FlatList, Pressable, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../lib/theme';
 import { useLastMonthGames } from '../lib/GamesContext';
 import { LoadingState, ErrorState } from '../lib/StateViews';
@@ -27,7 +28,7 @@ export default function WhatYouMissedScreen() {
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.top}>
         <Pressable style={styles.backBtn} onPress={() => router.back()}>
-          <Text style={styles.backBtnText}>←</Text>
+          <Ionicons name="arrow-back" size={22} color={colors.white} />
         </Pressable>
         <View>
           <Text style={styles.title}>What You Missed</Text>
@@ -69,16 +70,6 @@ const styles = StyleSheet.create({
   backBtn: {
     width: 34, height: 34, borderRadius: 9, backgroundColor: colors.bgCard,
     alignItems: 'center', justifyContent: 'center',
-  },
-  // FIXED (Android back-arrow vertical centering) — see app/accounts.js's
-  // matching comment for the full story: same real prior fix (commit
-  // 2bd96a4b, "Detail Nav Fix"), only ever applied to app/game/[title].js
-  // before now, propagated here since this screen shares the identical
-  // container/glyph/font-size pattern.
-  backBtnText: {
-    color: colors.white, fontSize: 18, lineHeight: 20,
-    textAlignVertical: 'center', includeFontPadding: false,
-    marginTop: -1,
   },
   title: { fontFamily: 'Poppins_700Bold', fontSize: 15, color: colors.white },
   subtitle: { fontSize: 11.5, color: colors.mutedDim, marginTop: 2, fontFamily: 'Inter_500Medium' },
