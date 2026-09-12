@@ -38,7 +38,14 @@ export default function TabsLayout() {
     <Tabs
       screenOptions={{
         headerShown: true,
-        header: () => <TopBar />,
+        // ADDED (Phase 3E — tap logo to scroll to top / go to Calendar):
+        // React Navigation's header render function is always called with
+        // { route, navigation, options, layout } — previously discarded
+        // entirely. Passing `route` through lets TopBar tell which tab it's
+        // currently rendering for (route.name is 'index' for Calendar,
+        // 'watchlist' for Watchlist — the only "which tab is active" signal
+        // that exists anywhere; there's no separate global state for it).
+        header: ({ route }) => <TopBar route={route} />,
         tabBarStyle: {
           backgroundColor: colors.bgNav,
           borderTopColor: colors.line,

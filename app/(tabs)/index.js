@@ -6,6 +6,7 @@ import { useGames } from '../../lib/GamesContext';
 import { LoadingState, ErrorState } from '../../lib/StateViews';
 import { daysUntil, MONTH_NAMES, effectiveDate } from '../../lib/dates';
 import { useWatchlist } from '../../lib/WatchlistContext';
+import { registerCalendarListRef } from '../../lib/calendarScrollRef';
 import GameCard from '../../components/GameCard';
 import HeroCarousel from '../../components/HeroCarousel';
 
@@ -108,6 +109,16 @@ export default function CalendarScreen() {
   // this filter is a rolling window that shifts day to day, so there's
   // nothing sensible to persist as a default. Always starts on "All Months".
   const [activeMonth, setActiveMonth] = useState('all');
+  // ADDED (Phase 3E — tap logo to scroll to top): registered once so
+  // TopBar (a sibling in the navigation tree, rendered by the Tabs
+  // navigator as this screen's own header — see components/TopBar.js) can
+  // trigger a scroll-to-top without needing a direct reference to this
+  // screen's SectionList. See lib/calendarScrollRef.js for why this is a
+  // plain shared module rather than a Context provider.
+  const listRef = useRef(null);
+  useEffect(() => {
+    registerCalendarListRef(listRef);
+  }, []);
 
   // Games shown on the Calendar screen exclude anything already on the
   // watchlist — once you've saved a game, the Calendar's job (helping you
@@ -326,6 +337,7 @@ export default function CalendarScreen() {
   return (
     <View style={styles.container}>
       <SectionList
+        ref={listRef}
         sections={sections}
         keyExtractor={(item) => item.title}
         renderItem={({ item }) => (
