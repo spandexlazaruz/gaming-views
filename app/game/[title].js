@@ -8,7 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { colors, PLATFORMS, posterThemes, hashStr } from '../../lib/theme';
 import { STORE_LABELS, resolveStoreUrl } from '../../lib/stores';
-import { useGames, useLastMonthGames } from '../../lib/GamesContext';
+import { useGames, useLastMonthGames, useGameLookup } from '../../lib/GamesContext';
 import { LoadingState } from '../../lib/StateViews';
 import { daysUntil, formatDate, formatDateShort, MONTH_NAMES, platformDateGroups } from '../../lib/dates';
 import { useWatchlist, LEAD_OPTIONS } from '../../lib/WatchlistContext';
@@ -210,8 +210,24 @@ export default function GameDetailScreen() {
   const primaryGame = games.find((g) => g.title === decodedTitle);
   const needsLastMonthFallback = !loading && !primaryGame;
   const { games: lastMonthGames, loading: lastMonthLoading } = useLastMonthGames({ enabled: needsLastMonthFallback });
-  const game = primaryGame || (needsLastMonthFallback ? lastMonthGames.find((g) => g.title === decodedTitle) : undefined);
-  const stillResolving = loading || (needsLastMonthFallback && lastMonthLoading);
+  const lastMonthGame = needsLastMonthFallback ? lastMonthGames.find((g) => g.title === decodedTitle) : undefined;
+  // FIXED (Wolverine bug — "Game not found" for a title that already
+  // released THIS calendar month): last-month's fixed window (see its own
+  // comment above, and gaming-views-backend/api/games.js's buildQueryWindow)
+  // only covers the PREVIOUS calendar month — a game released earlier this
+  // month, including today, still isn't in either array, even though the
+  // Watchlist's 24h-post-release grace window (a local cache, no backend
+  // call) correctly kept its card visible there. Same lazy cascade as the
+  // last-month fallback: only fires once that's also genuinely finished and
+  // failed, via a dedicated no-date-window backend lookup (useGameLookup,
+  // ?when=lookup) rather than yet another fixed month boundary with its own
+  // gap one month later.
+  const needsLookupFallback = needsLastMonthFallback && !lastMonthLoading && !lastMonthGame;
+  const { game: lookupGame, loading: lookupLoading } = useGameLookup(decodedTitle, { enabled: needsLookupFallback });
+  const game = primaryGame || lastMonthGame || (needsLookupFallback ? lookupGame : undefined);
+  const stillResolving = loading
+    || (needsLastMonthFallback && lastMonthLoading)
+    || (needsLookupFallback && lookupLoading);
 
   useEffect(() => {
     setDescExpanded(false);
@@ -415,9 +431,14 @@ export default function GameDetailScreen() {
     <SafeAreaView style={styles.container} edges={['top']}>
       {FixedHeader}
       <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }}>
-        {game.coverUrl ? (
+        {(game.coverHeroUrl || game.coverUrl) ? (
           <View style={styles.heroPoster}>
-            <Image source={{ uri: game.coverUrl }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+            {/* coverHeroUrl (t_1080p) is sized for this full-width hero;
+                coverUrl (t_cover_big) is the smaller size list cards use —
+                see gaming-views-backend/api/games.js's toCoverUrl/
+                toCoverHeroUrl. Falls back to coverUrl only if an older
+                cached game object predates coverHeroUrl existing. */}
+            <Image source={{ uri: game.coverHeroUrl || game.coverUrl }} style={StyleSheet.absoluteFill} resizeMode="cover" />
             <LinearGradient
               colors={['transparent', 'rgba(0,0,0,0.65)']}
               start={{ x: 0, y: 0.4 }} end={{ x: 0, y: 1 }}
