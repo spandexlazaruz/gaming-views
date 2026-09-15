@@ -39,6 +39,23 @@ module.exports = {
     },
     plugins: [
       'expo-router',
+      // ADDED (Play Console "App optimisation is below our threshold" —
+      // obfuscation percentage 1%, fix-by Feb 2027): Expo/EAS managed builds
+      // (no checked-in android/ folder) leave R8 code shrinking/obfuscation
+      // OFF by default unless explicitly enabled here. Android-only — R8 is
+      // an Android build tool, iOS builds are unaffected. Only touches the
+      // release build config; needs a fresh production Android build to
+      // actually take effect and to confirm minification doesn't strip
+      // anything a library needs without an explicit keep rule.
+      [
+        'expo-build-properties',
+        {
+          android: {
+            enableProguardInReleaseBuilds: true,
+            enableShrinkResourcesInReleaseBuilds: true,
+          },
+        },
+      ],
       [
         'expo-splash-screen',
         {
