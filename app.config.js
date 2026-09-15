@@ -43,6 +43,7 @@ module.exports = {
       'expo-font',
       'expo-image',
       'expo-localization',
+      'expo-status-bar',
       [
         'expo-splash-screen',
         {
