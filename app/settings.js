@@ -5,6 +5,15 @@ import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../lib/theme';
 import { useWatchlist } from '../lib/WatchlistContext';
 import { ensureNotificationPermission } from '../lib/notifications';
+import Constants from 'expo-constants';
+
+// Real marketing version, pulled from app.config.js at build time rather than
+// hardcoded here — this used to be a static 'v0.2 · SDK 54' string that went stale
+// every release. SDK number is still a plain literal (Constants.expoConfig?.sdkVersion
+// isn't reliably populated at runtime on EAS-managed builds) — update this manually
+// whenever the Expo SDK itself is bumped, which happens far less often than the
+// marketing version does.
+const APP_VERSION_LABEL = `v${Constants.expoConfig?.version || '0.3.0'} · SDK 57`;
 
 function SwitchRow({ title, desc, value, onValueChange, disabled }) {
   return (
@@ -40,7 +49,7 @@ export default function SettingsScreen() {
 
   const sendFeedback = () => {
     const subject = encodeURIComponent('Gaming Views Feedback');
-    const body = encodeURIComponent('\n\n—\nSent from the Gaming Views app (v0.2 · SDK 54)');
+    const body = encodeURIComponent(`\n\n—\nSent from the Gaming Views app (${APP_VERSION_LABEL})`);
     Linking.openURL(`mailto:gamingviewspodcast@gmail.com?subject=${subject}&body=${body}`).catch(() => {});
   };
 
@@ -92,7 +101,7 @@ export default function SettingsScreen() {
         <Text style={[styles.sectionHead, { marginTop: 26 }]}>ABOUT</Text>
         <View style={styles.aboutBlock}>
           <Text style={styles.appName}>Gaming Views</Text>
-          <Text style={styles.appVer}>v0.2 · SDK 54</Text>
+          <Text style={styles.appVer}>{APP_VERSION_LABEL}</Text>
         </View>
         <View style={styles.aboutLinks}>
           <Pressable style={styles.aboutLink} onPress={() => Linking.openURL('https://spandexlazaruz.github.io/gaming-views/privacy-policy.html').catch(() => {})}>
