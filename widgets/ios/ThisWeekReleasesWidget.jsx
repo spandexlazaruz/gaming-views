@@ -38,6 +38,7 @@ function WeekRow({ game }) {
 // Real widgets can't scroll, so this is capped rather than a real list -
 // systemLarge gets a couple more rows than systemMedium.
 export const thisWeekReleasesWidget = createWidget('ThisWeekReleases', (props, environment) => {
+  'widget';
   const nextRelease = props.nextRelease ?? null;
   const thisWeek = props.thisWeek ?? [];
   const maxRows = environment.widgetFamily === 'systemLarge' ? 6 : 3;

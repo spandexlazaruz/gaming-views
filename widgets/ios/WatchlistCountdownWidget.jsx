@@ -20,6 +20,7 @@ import { colors } from '../../lib/theme';
 // here at the root - tapping anywhere opens that one game, or just the
 // app itself when there's no release to link to.
 export const watchlistCountdownWidget = createWidget('WatchlistCountdown', (props) => {
+  'widget';
   const nextRelease = props.nextRelease ?? null;
   const modifiers = [containerBackground(colors.bgCard, 'widget')];
   if (nextRelease) modifiers.push(widgetURL(gameDeepLink(nextRelease.title)));
