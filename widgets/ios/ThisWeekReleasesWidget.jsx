@@ -1,7 +1,7 @@
 import React from 'react';
 import { createWidget } from 'expo-widgets';
 import { VStack, HStack, Text, Divider, Link, Image } from '@expo/ui/swift-ui';
-import { containerBackground, foregroundStyle, background, cornerRadius, clipShape, resizable, aspectRatio, frame, font, padding } from '@expo/ui/swift-ui/modifiers';
+import { containerBackground, foregroundStyle, background, cornerRadius, clipShape, resizable, aspectRatio, frame, font, padding, lineLimit } from '@expo/ui/swift-ui/modifiers';
 
 // The "ThisWeekReleases" widget (medium/large only, per app.config.js -
 // no small size, so it never has to fit the countdown-only layout).
@@ -64,13 +64,13 @@ export const thisWeekReleasesWidget = createWidget('ThisWeekReleases', (props, e
         />
       ) : null}
       <VStack alignment="leading" spacing={6}>
-        <Text modifiers={[font({ size: 16, weight: 'bold' }), foregroundStyle(colorWhite)]}>
+        <Text modifiers={[font({ size: 16, weight: 'bold' }), foregroundStyle(colorWhite), lineLimit(1)]}>
           {nextRelease.title}
         </Text>
         <Text
           date={new Date(nextRelease.date[0], nextRelease.date[1], nextRelease.date[2])}
           dateStyle="relative"
-          modifiers={[font({ size: 12 }), foregroundStyle(colorMuted)]}
+          modifiers={[font({ size: 12 }), foregroundStyle(colorMuted), lineLimit(1)]}
         />
       </VStack>
     </HStack>
@@ -99,8 +99,8 @@ export const thisWeekReleasesWidget = createWidget('ThisWeekReleases', (props, e
                   <VStack modifiers={[frame({ width: 8, height: 8 }), background(accentColor), cornerRadius(4)]}>
                     <Text> </Text>
                   </VStack>
-                  <Text modifiers={[font({ size: 14 }), foregroundStyle(colorWhite)]}>{game.title}</Text>
-                  <Text modifiers={[font({ size: 12 }), foregroundStyle(colorMuted)]}>{dayLabel(game.date)}</Text>
+                  <Text modifiers={[font({ size: 14 }), foregroundStyle(colorWhite), lineLimit(1)]}>{game.title}</Text>
+                  <Text modifiers={[font({ size: 12 }), foregroundStyle(colorMuted), lineLimit(1)]}>{dayLabel(game.date)}</Text>
                 </HStack>
               </Link>
             );

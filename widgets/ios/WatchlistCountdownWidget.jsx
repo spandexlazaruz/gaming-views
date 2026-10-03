@@ -1,7 +1,7 @@
 import React from 'react';
 import { createWidget } from 'expo-widgets';
 import { VStack, ZStack, Spacer, Text, Image } from '@expo/ui/swift-ui';
-import { containerBackground, foregroundStyle, background, font, frame, cornerRadius, resizable, aspectRatio, padding, widgetURL } from '@expo/ui/swift-ui/modifiers';
+import { containerBackground, foregroundStyle, background, font, frame, cornerRadius, resizable, aspectRatio, padding, widgetURL, lineLimit } from '@expo/ui/swift-ui/modifiers';
 
 // The "WatchlistCountdown" widget - name must match app.config.js's
 // expo-widgets entry and the WidgetFamily list declared there. This is the
@@ -64,10 +64,14 @@ export const watchlistCountdownWidget = createWidget('WatchlistCountdown', (prop
       <VStack modifiers={[frame({ width: 22, height: 4 }), background(accentColor), cornerRadius(2)]}>
         <Spacer minLength={0} />
       </VStack>
-      <Text modifiers={[font({ size: 15, weight: 'bold' }), foregroundStyle(colorWhite)]}>
+      <Text modifiers={[font({ size: 15, weight: 'bold' }), foregroundStyle(colorWhite), lineLimit(1)]}>
         {nextRelease.title}
       </Text>
-      <Text date={releaseDate} dateStyle="relative" modifiers={[font({ size: 11 }), foregroundStyle(colorMuted)]} />
+      <Text
+        date={releaseDate}
+        dateStyle="relative"
+        modifiers={[font({ size: 11 }), foregroundStyle(colorMuted), lineLimit(1)]}
+      />
     </VStack>
   );
 
@@ -81,10 +85,14 @@ export const watchlistCountdownWidget = createWidget('WatchlistCountdown', (prop
         <VStack modifiers={[frame({ width: 24, height: 4 }), background(accentColor), cornerRadius(2)]}>
           <Spacer minLength={0} />
         </VStack>
-        <Text modifiers={[font({ size: 16, weight: 'bold' }), foregroundStyle(colorWhite)]}>
+        <Text modifiers={[font({ size: 16, weight: 'bold' }), foregroundStyle(colorWhite), lineLimit(1)]}>
           {nextRelease.title}
         </Text>
-        <Text date={releaseDate} dateStyle="relative" modifiers={[font({ size: 12 }), foregroundStyle(colorMuted)]} />
+        <Text
+          date={releaseDate}
+          dateStyle="relative"
+          modifiers={[font({ size: 12 }), foregroundStyle(colorMuted), lineLimit(1)]}
+        />
       </VStack>
     );
   }
