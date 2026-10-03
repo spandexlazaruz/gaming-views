@@ -100,6 +100,44 @@ module.exports = {
           remindersPermission: "Gaming Views doesn't use Reminders.",
         },
       ],
+      // ADDED (home-screen widgets, Android): two widgets, "Next Release"
+      // (a watchlist countdown, any size) and "This Week" (medium/large
+      // only, countdown + the full weekly list — deliberately no small
+      // size, matching the "small = countdown only" design). Widget UI
+      // lives in widgets/android/*, registered via index.js's
+      // registerAndroidWidgetTaskHandler (see that file's comment on why
+      // Expo Router's own entry has to be wrapped rather than replaced).
+      // No `fonts` entry: widget text uses the system default font rather
+      // than this app's Inter/Poppins — custom fonts are supported by the
+      // plugin but add real prebuild risk for a purely cosmetic win this
+      // build doesn't need.
+      [
+        'react-native-android-widget',
+        {
+          widgets: [
+            {
+              name: 'WatchlistCountdown',
+              label: 'Next Release',
+              description: 'Countdown to your next watchlisted release.',
+              minWidth: '110dp',
+              minHeight: '110dp',
+              targetCellWidth: 2,
+              targetCellHeight: 2,
+              updatePeriodMillis: 1800000,
+            },
+            {
+              name: 'ThisWeekReleases',
+              label: 'This Week',
+              description: 'Tracked games releasing in the next 7 days.',
+              minWidth: '250dp',
+              minHeight: '180dp',
+              targetCellWidth: 4,
+              targetCellHeight: 3,
+              updatePeriodMillis: 1800000,
+            },
+          ],
+        },
+      ],
     ],
     extra: {
       router: {},
