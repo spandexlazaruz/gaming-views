@@ -39,6 +39,13 @@ module.exports = {
     },
     plugins: [
       'expo-router',
+      // ADDED (home-screen widgets, Android build fix): forces a single
+      // consistent androidx.work version across the whole dependency
+      // graph - see plugins/withWorkManagerFix.js for the real build-log-
+      // confirmed root cause (react-native-android-widget's own
+      // work-runtime:2.8.1 colliding with a transitively-resolved
+      // work-runtime-ktx:2.7.1 from elsewhere in the graph).
+      './plugins/withWorkManagerFix',
       // ADDED (Play Console "App optimisation is below our threshold" —
       // obfuscation percentage 1%, fix-by Feb 2027): Expo/EAS managed builds
       // (no checked-in android/ folder) leave R8 code shrinking/obfuscation
