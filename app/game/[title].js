@@ -217,17 +217,38 @@ export default function GameDetailScreen() {
   // only covers the PREVIOUS calendar month — a game released earlier this
   // month, including today, still isn't in either array, even though the
   // Watchlist's 24h-post-release grace window (a local cache, no backend
-  // call) correctly kept its card visible there. Same lazy cascade as the
-  // last-month fallback: only fires once that's also genuinely finished and
-  // failed, via a dedicated no-date-window backend lookup (useGameLookup,
-  // ?when=lookup) rather than yet another fixed month boundary with its own
-  // gap one month later.
-  const needsLookupFallback = needsLastMonthFallback && !lastMonthLoading && !lastMonthGame;
-  const { game: lookupGame, loading: lookupLoading } = useGameLookup(decodedTitle, { enabled: needsLookupFallback });
-  const game = primaryGame || lastMonthGame || (needsLookupFallback ? lookupGame : undefined);
+  // call) correctly kept its card visible there. This "light" match (title/
+  // date/platforms/cover thumbnail — enough for an instant first paint) is
+  // still resolved from the two list windows only, same lazy cascade as
+  // before.
+  const lightGame = primaryGame || lastMonthGame;
+
+  // ADDED (startup-performance fix): list-mode responses (useGames/
+  // useLastMonthGames, i.e. lightGame above) no longer include desc/
+  // coverHeroUrl/screenshots/videoId at all — see gaming-views-backend/
+  // api/games.js's stripDetailFields — since no list/card view anywhere
+  // else in the app ever read them. This screen is the one place that
+  // does, so it now always fetches full detail via the dedicated
+  // single-game lookup endpoint (?when=lookup) instead of only reaching
+  // for it as a last-resort fallback when a title is missing from both
+  // list windows entirely. useGameLookup already degrades gracefully to
+  // `{ game: null }` when a title doesn't resolve, so calling it
+  // unconditionally here is safe — it just won't contribute anything on a
+  // genuinely nonexistent title.
+  const { game: detailGame, loading: detailLoading } = useGameLookup(decodedTitle, { enabled: !!decodedTitle });
+  // Renders instantly from lightGame the moment it's available; detailGame's
+  // fields merge in on top a beat later once the lookup resolves. Every
+  // section below that needs screenshots/desc/videoId/coverHeroUrl already
+  // renders conditionally on field presence, so this reads as those
+  // sections appearing a moment after the rest of the page, not an error.
+  const game = lightGame ? { ...lightGame, ...(detailGame || {}) } : detailGame;
+  // Only wait on the detail fetch when there's no light match to render in
+  // the meantime — once lightGame exists, the detail fetch finishing late
+  // (or even failing) shouldn't block the page or show a loading spinner
+  // over content that's already there.
   const stillResolving = loading
     || (needsLastMonthFallback && lastMonthLoading)
-    || (needsLookupFallback && lookupLoading);
+    || (!lightGame && detailLoading);
 
   useEffect(() => {
     setDescExpanded(false);
