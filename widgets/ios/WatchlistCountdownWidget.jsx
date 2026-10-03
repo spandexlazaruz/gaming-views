@@ -26,26 +26,29 @@ import { containerBackground, foregroundStyle, background, font, frame, cornerRa
 // inlined directly inside this function so it's genuinely part of what
 // gets serialized.
 //
-// FIXED (date text missing entirely from the hero layout, not just
-// clipped): the original version gave the Image no explicit frame,
-// assuming it would naturally inherit the widget's fixed system size the
-// way containerBackground does. It doesn't - resizable() strips an Image
-// of its intrinsic size entirely (that's what "resizable" means), and
-// without SOME fixed-size sibling to anchor against, a ZStack whose
-// children are all flexible (the resizable Image, the Spacer-filled
-// gradient VStack) has nothing concrete to size itself to, so the whole
-// stack collapses rather than filling the widget - textColumn's own
-// small intrinsic size was all that was actually visible, which is why
-// only the title (the first thing laid out) showed and the date line
-// after it fell outside that tiny collapsed area. Fixed by giving the
-// hero layers an explicit frame instead, sized from WidgetFamily -
-// WidgetEnvironment has no literal point-size field, so these are the
-// well-known fixed iPhone widget dimensions per family (HIG values; the
-// Image's own aspectRatio(fill) + the OS's standard widget corner
-// masking absorb the few points of variance across actual device sizes).
-// Declared INSIDE the function, not at module scope - a sibling
-// module-level declaration doesn't survive serialization either (see the
-// 'widget' directive comment above for the full story).
+// FIXED (hero layout sizing): the Image/gradient/outer ZStack all now get
+// an explicit frame sized from WidgetFamily (WidgetEnvironment has no
+// literal point-size field, so these are the standard fixed iPhone widget
+// dimensions per family - HIG values; aspectRatio(fill) plus the OS's own
+// widget corner masking absorb the few points of real variance across
+// device sizes). Declared INSIDE the function, not at module scope - a
+// sibling module-level declaration doesn't survive serialization either
+// (see the 'widget' directive comment above for the full story).
+//
+// FIXED (date text still missing on-device after the sizing fix, on
+// systemLarge specifically - confirmed via screenshot the image/title
+// render correctly, just not the date): a live auto-updating
+// `date`+`dateStyle="relative"` Text reliably failed to render only in
+// this nested ZStack > VStack > Text position, while the exact same
+// prop combination works fine in the flat (no-image) fallback below and
+// in ThisWeekReleasesWidget.jsx - a real quirk in this library's
+// handling of the live-updating Text variant at this nesting depth, not
+// a frame/sizing problem. Replaced with a plain pre-computed string
+// (countdownLabel + a short formatted date, mirroring
+// widgets/android/WatchlistCountdownWidget.jsx's own already-working
+// approach) - loses live auto-refresh without reopening the app, but
+// that trade only matters while the release is many days out, and a
+// reliably-rendering widget matters more than that convenience.
 export const watchlistCountdownWidget = createWidget('WatchlistCountdown', (props, environment) => {
   'widget';
 
@@ -54,6 +57,15 @@ export const watchlistCountdownWidget = createWidget('WatchlistCountdown', (prop
     systemMedium: { width: 329, height: 155 },
     systemLarge: { width: 329, height: 345 },
   };
+
+  function countdownLabel(date) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const days = Math.round((date - today) / 86400000);
+    if (days === 0) return 'Today!';
+    if (days === 1) return 'Tomorrow';
+    return `In ${days} days`;
+  }
 
   const nextRelease = props.nextRelease ?? null;
   const heroSize = HERO_SIZES[environment.widgetFamily] || HERO_SIZES.systemSmall;
@@ -79,6 +91,7 @@ export const watchlistCountdownWidget = createWidget('WatchlistCountdown', (prop
   const accentPlatform = [...nextRelease.platforms].sort()[0];
   const accentColor = platformColors[accentPlatform] || colorOrange;
   const releaseDate = new Date(nextRelease.date[0], nextRelease.date[1], nextRelease.date[2]);
+  const subtitle = `${countdownLabel(releaseDate)} · ${releaseDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
   const deepLink = `gamingviews://game/${encodeURIComponent(nextRelease.title)}`;
 
   const textColumn = (
@@ -89,11 +102,7 @@ export const watchlistCountdownWidget = createWidget('WatchlistCountdown', (prop
       <Text modifiers={[font({ size: 15, weight: 'bold' }), foregroundStyle(colorWhite), lineLimit(1)]}>
         {nextRelease.title}
       </Text>
-      <Text
-        date={releaseDate}
-        dateStyle="relative"
-        modifiers={[font({ size: 11 }), foregroundStyle(colorMuted), lineLimit(1)]}
-      />
+      <Text modifiers={[font({ size: 11 }), foregroundStyle(colorMuted), lineLimit(1)]}>{subtitle}</Text>
     </VStack>
   );
 
@@ -110,11 +119,7 @@ export const watchlistCountdownWidget = createWidget('WatchlistCountdown', (prop
         <Text modifiers={[font({ size: 16, weight: 'bold' }), foregroundStyle(colorWhite), lineLimit(1)]}>
           {nextRelease.title}
         </Text>
-        <Text
-          date={releaseDate}
-          dateStyle="relative"
-          modifiers={[font({ size: 12 }), foregroundStyle(colorMuted), lineLimit(1)]}
-        />
+        <Text modifiers={[font({ size: 12 }), foregroundStyle(colorMuted), lineLimit(1)]}>{subtitle}</Text>
       </VStack>
     );
   }

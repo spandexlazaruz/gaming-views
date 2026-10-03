@@ -29,6 +29,19 @@ export const thisWeekReleasesWidget = createWidget('ThisWeekReleases', (props, e
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   }
 
+  // FIXED (missing date text in the countdown block, same real cause as
+  // widgets/ios/WatchlistCountdownWidget.jsx's own fix - see its comment):
+  // a live date+dateStyle="relative" Text reliably failed to render here
+  // too. Plain pre-computed string instead.
+  function countdownSubtitle(dateArr) {
+    const date = new Date(dateArr[0], dateArr[1], dateArr[2]);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const days = Math.round((date - today) / 86400000);
+    const label = days === 0 ? 'Today!' : days === 1 ? 'Tomorrow' : `In ${days} days`;
+    return `${label} · ${date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
+  }
+
   const nextRelease = props.nextRelease ?? null;
   const thisWeek = props.thisWeek ?? [];
   const colorWhite = '#FFFFFF';
@@ -67,11 +80,9 @@ export const thisWeekReleasesWidget = createWidget('ThisWeekReleases', (props, e
         <Text modifiers={[font({ size: 16, weight: 'bold' }), foregroundStyle(colorWhite), lineLimit(1)]}>
           {nextRelease.title}
         </Text>
-        <Text
-          date={new Date(nextRelease.date[0], nextRelease.date[1], nextRelease.date[2])}
-          dateStyle="relative"
-          modifiers={[font({ size: 12 }), foregroundStyle(colorMuted), lineLimit(1)]}
-        />
+        <Text modifiers={[font({ size: 12 }), foregroundStyle(colorMuted), lineLimit(1)]}>
+          {countdownSubtitle(nextRelease.date)}
+        </Text>
       </VStack>
     </HStack>
   );
