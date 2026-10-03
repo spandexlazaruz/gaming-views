@@ -43,7 +43,18 @@ export const thisWeekReleasesWidget = createWidget('ThisWeekReleases', (props, e
   }
 
   const nextRelease = props.nextRelease ?? null;
-  const thisWeek = props.thisWeek ?? [];
+  // FIXED (updateSnapshot throwing "Exception in HostFunction" on every
+  // push): the native bridge's argument marshaling can't handle an array
+  // of objects as a prop value (confirmed via Metro console logging - see
+  // lib/widgetBridge.js's own comment on this same fix) - thisWeek is
+  // sent pre-serialized as JSON and parsed back out here instead.
+  let thisWeek = [];
+  try {
+    thisWeek = props.thisWeekJson ? JSON.parse(props.thisWeekJson) : [];
+  } catch {
+    // Malformed/missing JSON shouldn't crash the whole widget - just show
+    // the "nothing this week" empty state below instead.
+  }
   const colorWhite = '#FFFFFF';
   const colorMuted = '#9AA3AF';
   const colorBgCard = '#1C2129';
