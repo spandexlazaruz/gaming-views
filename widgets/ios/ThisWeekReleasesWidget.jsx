@@ -1,7 +1,7 @@
 import React from 'react';
 import { createWidget } from 'expo-widgets';
-import { VStack, HStack, Text, Divider, Link } from '@expo/ui/swift-ui';
-import { containerBackground, foregroundStyle, background, cornerRadius, frame, font, padding } from '@expo/ui/swift-ui/modifiers';
+import { VStack, HStack, Text, Divider, Link, Image } from '@expo/ui/swift-ui';
+import { containerBackground, foregroundStyle, background, cornerRadius, clipShape, resizable, aspectRatio, frame, font, padding } from '@expo/ui/swift-ui/modifiers';
 
 // The "ThisWeekReleases" widget (medium/large only, per app.config.js -
 // no small size, so it never has to fit the countdown-only layout).
@@ -51,16 +51,29 @@ export const thisWeekReleasesWidget = createWidget('ThisWeekReleases', (props, e
       </Text>
     </VStack>
   ) : (
-    <VStack alignment="leading" spacing={6} modifiers={[padding({ all: 16 })]}>
-      <Text modifiers={[font({ size: 16, weight: 'bold' }), foregroundStyle(colorWhite)]}>
-        {nextRelease.title}
-      </Text>
-      <Text
-        date={new Date(nextRelease.date[0], nextRelease.date[1], nextRelease.date[2])}
-        dateStyle="relative"
-        modifiers={[font({ size: 12 }), foregroundStyle(colorMuted)]}
-      />
-    </VStack>
+    <HStack spacing={12} modifiers={[padding({ all: 16 })]}>
+      {props.coverImageUri ? (
+        <Image
+          uiImage={props.coverImageUri}
+          modifiers={[
+            resizable(),
+            aspectRatio({ contentMode: 'fill' }),
+            frame({ width: 48, height: 64 }),
+            clipShape('roundedRectangle', 8),
+          ]}
+        />
+      ) : null}
+      <VStack alignment="leading" spacing={6}>
+        <Text modifiers={[font({ size: 16, weight: 'bold' }), foregroundStyle(colorWhite)]}>
+          {nextRelease.title}
+        </Text>
+        <Text
+          date={new Date(nextRelease.date[0], nextRelease.date[1], nextRelease.date[2])}
+          dateStyle="relative"
+          modifiers={[font({ size: 12 }), foregroundStyle(colorMuted)]}
+        />
+      </VStack>
+    </HStack>
   );
 
   return (

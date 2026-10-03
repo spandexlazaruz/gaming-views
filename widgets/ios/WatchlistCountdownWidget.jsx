@@ -1,7 +1,7 @@
 import React from 'react';
 import { createWidget } from 'expo-widgets';
-import { VStack, Spacer, Text } from '@expo/ui/swift-ui';
-import { containerBackground, foregroundStyle, background, font, frame, cornerRadius, padding, widgetURL } from '@expo/ui/swift-ui/modifiers';
+import { VStack, HStack, Spacer, Text, Image } from '@expo/ui/swift-ui';
+import { containerBackground, foregroundStyle, background, font, frame, cornerRadius, clipShape, resizable, aspectRatio, padding, widgetURL } from '@expo/ui/swift-ui/modifiers';
 
 // The "WatchlistCountdown" widget - name must match app.config.js's
 // expo-widgets entry and the WidgetFamily list declared there. Mirrors
@@ -47,12 +47,8 @@ export const watchlistCountdownWidget = createWidget('WatchlistCountdown', (prop
   const releaseDate = new Date(nextRelease.date[0], nextRelease.date[1], nextRelease.date[2]);
   const deepLink = `gamingviews://game/${encodeURIComponent(nextRelease.title)}`;
 
-  return (
-    <VStack
-      alignment="leading"
-      spacing={6}
-      modifiers={[padding({ all: 16 }), containerBackground(colorBgCard, 'widget'), widgetURL(deepLink)]}
-    >
+  const textColumn = (
+    <VStack alignment="leading" spacing={6}>
       <VStack modifiers={[frame({ width: 24, height: 4 }), background(accentColor), cornerRadius(2)]}>
         <Spacer minLength={0} />
       </VStack>
@@ -61,5 +57,25 @@ export const watchlistCountdownWidget = createWidget('WatchlistCountdown', (prop
       </Text>
       <Text date={releaseDate} dateStyle="relative" modifiers={[font({ size: 12 }), foregroundStyle(colorMuted)]} />
     </VStack>
+  );
+
+  return (
+    <HStack
+      spacing={12}
+      modifiers={[padding({ all: 16 }), containerBackground(colorBgCard, 'widget'), widgetURL(deepLink)]}
+    >
+      {props.coverImageUri ? (
+        <Image
+          uiImage={props.coverImageUri}
+          modifiers={[
+            resizable(),
+            aspectRatio({ contentMode: 'fill' }),
+            frame({ width: 48, height: 64 }),
+            clipShape('roundedRectangle', 8),
+          ]}
+        />
+      ) : null}
+      {textColumn}
+    </HStack>
   );
 });
