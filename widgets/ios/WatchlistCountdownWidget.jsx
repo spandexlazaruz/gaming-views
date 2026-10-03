@@ -26,15 +26,37 @@ import { containerBackground, foregroundStyle, background, font, frame, cornerRa
 // inlined directly inside this function so it's genuinely part of what
 // gets serialized.
 //
-// No explicit frame on the hero Image/gradient layers below - the
-// top-level ZStack naturally receives the widget's own fixed system size
-// from WidgetKit (same reason containerBackground can just fill without
-// any size math), so a resizable + aspectRatio(fill) Image fills it
-// correctly at any widget family size without needing to know the exact
-// point dimensions in advance.
-export const watchlistCountdownWidget = createWidget('WatchlistCountdown', (props) => {
+// FIXED (date text missing entirely from the hero layout, not just
+// clipped): the original version gave the Image no explicit frame,
+// assuming it would naturally inherit the widget's fixed system size the
+// way containerBackground does. It doesn't - resizable() strips an Image
+// of its intrinsic size entirely (that's what "resizable" means), and
+// without SOME fixed-size sibling to anchor against, a ZStack whose
+// children are all flexible (the resizable Image, the Spacer-filled
+// gradient VStack) has nothing concrete to size itself to, so the whole
+// stack collapses rather than filling the widget - textColumn's own
+// small intrinsic size was all that was actually visible, which is why
+// only the title (the first thing laid out) showed and the date line
+// after it fell outside that tiny collapsed area. Fixed by giving the
+// hero layers an explicit frame instead, sized from WidgetFamily -
+// WidgetEnvironment has no literal point-size field, so these are the
+// well-known fixed iPhone widget dimensions per family (HIG values; the
+// Image's own aspectRatio(fill) + the OS's standard widget corner
+// masking absorb the few points of variance across actual device sizes).
+// Declared INSIDE the function, not at module scope - a sibling
+// module-level declaration doesn't survive serialization either (see the
+// 'widget' directive comment above for the full story).
+export const watchlistCountdownWidget = createWidget('WatchlistCountdown', (props, environment) => {
   'widget';
+
+  const HERO_SIZES = {
+    systemSmall: { width: 155, height: 155 },
+    systemMedium: { width: 329, height: 155 },
+    systemLarge: { width: 329, height: 345 },
+  };
+
   const nextRelease = props.nextRelease ?? null;
+  const heroSize = HERO_SIZES[environment.widgetFamily] || HERO_SIZES.systemSmall;
   const colorWhite = '#FFFFFF';
   const colorMuted = '#9AA3AF';
   const colorBgCard = '#1C2129';
@@ -98,10 +120,17 @@ export const watchlistCountdownWidget = createWidget('WatchlistCountdown', (prop
   }
 
   return (
-    <ZStack alignment="bottomLeading" modifiers={[containerBackground(colorBgCard, 'widget'), widgetURL(deepLink)]}>
-      <Image uiImage={props.coverImageUri} modifiers={[resizable(), aspectRatio({ contentMode: 'fill' })]} />
+    <ZStack
+      alignment="bottomLeading"
+      modifiers={[frame(heroSize), containerBackground(colorBgCard, 'widget'), widgetURL(deepLink)]}
+    >
+      <Image
+        uiImage={props.coverImageUri}
+        modifiers={[resizable(), aspectRatio({ contentMode: 'fill' }), frame(heroSize)]}
+      />
       <VStack
         modifiers={[
+          frame(heroSize),
           background({
             type: 'linearGradient',
             colors: ['rgba(10, 12, 16, 0)', 'rgba(10, 12, 16, 0.92)'],
