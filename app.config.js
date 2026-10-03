@@ -138,6 +138,43 @@ module.exports = {
           ],
         },
       ],
+      // ADDED (home-screen widgets, iOS): same two widgets as the Android
+      // plugin above - "WatchlistCountdown" (any size) and
+      // "ThisWeekReleases" (medium/large only, no small, matching
+      // "small = countdown only"). Widget UI lives in widgets/ios/*,
+      // defined via expo-widgets' createWidget - unlike Android, there's
+      // no separate task-handler registration step; the widget definition
+      // itself IS the thing that gets pushed to (see lib/widgetBridge.js).
+      // `enableAndroid` is deliberately left at its default (false): this
+      // package's own Android support is explicitly experimental/
+      // off-by-default per its own config-plugin type comment, so Android
+      // uses the dedicated, mature react-native-android-widget instead.
+      // Needs a real App Group set up in the Apple Developer portal before
+      // this can build for iOS - walk through together before the first
+      // iOS widget build/submission.
+      [
+        'expo-widgets',
+        {
+          bundleIdentifier: IS_DEV ? 'com.gamingviews.app.dev' : 'com.gamingviews.app',
+          groupIdentifier: IS_DEV ? 'group.com.gamingviews.app.dev' : 'group.com.gamingviews.app',
+          widgets: [
+            {
+              name: 'WatchlistCountdown',
+              displayName: 'Next Release',
+              description: 'Countdown to your next watchlisted release.',
+              supportedFamilies: ['systemSmall', 'systemMedium', 'systemLarge'],
+              contentMarginsDisabled: false,
+            },
+            {
+              name: 'ThisWeekReleases',
+              displayName: 'This Week',
+              description: 'Tracked games releasing in the next 7 days.',
+              supportedFamilies: ['systemMedium', 'systemLarge'],
+              contentMarginsDisabled: false,
+            },
+          ],
+        },
+      ],
     ],
     extra: {
       router: {},
