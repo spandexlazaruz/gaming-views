@@ -1,33 +1,65 @@
 import React from 'react';
 import { createWidget } from 'expo-widgets';
-import { VStack } from '@expo/ui/swift-ui';
-import { containerBackground, widgetURL } from '@expo/ui/swift-ui/modifiers';
-import { CountdownBlock } from './CountdownBlock';
-import { gameDeepLink } from '../../lib/widgetData';
-import { colors } from '../../lib/theme';
+import { VStack, Spacer, Text } from '@expo/ui/swift-ui';
+import { containerBackground, foregroundStyle, background, font, frame, cornerRadius, padding, widgetURL } from '@expo/ui/swift-ui/modifiers';
 
 // The "WatchlistCountdown" widget - name must match app.config.js's
 // expo-widgets entry and the WidgetFamily list declared there. Mirrors
-// widgets/android/WatchlistCountdownWidget.jsx: just the shared countdown
-// block, no weekly list - this is the small/unobtrusive widget.
+// widgets/android/WatchlistCountdownWidget.jsx's content (countdown only,
+// no weekly list - this is the small/unobtrusive widget).
 //
-// containerBackground(_, 'widget') is required on the root view since
-// iOS 17 - a plain `background` modifier is ignored/clipped on a widget's
-// root (confirmed via @expo/ui's own containerBackground.d.ts).
-//
-// This widget's only content is the countdown block, so widgetURL (a
-// widget supports just one, see CountdownBlock.jsx's comment) belongs
-// here at the root - tapping anywhere opens that one game, or just the
-// app itself when there's no release to link to.
+// FIXED (on-device crash: "ReferenceError: Can't find variable: colors"):
+// a 'widget'-marked function is extracted and serialized to a standalone
+// string by babel-preset-expo's widgets-plugin.js (confirmed by reading
+// it) - it loses the surrounding module's scope entirely, so the earlier
+// version's imports of lib/theme.js, lib/dates.js, lib/widgetData.js and
+// a separate ./CountdownBlock component all failed to resolve at runtime
+// despite working fine in the main app. @expo/ui/swift-ui's own exports
+// (VStack, Text, the modifiers) are the one exception - this package is
+// specifically built around this execution model, so those keep working
+// as regular imports. Everything else - colors, the countdown
+// label/date logic, the deep-link URL - is now inlined directly inside
+// this function so it's genuinely part of what gets serialized.
 export const watchlistCountdownWidget = createWidget('WatchlistCountdown', (props) => {
   'widget';
   const nextRelease = props.nextRelease ?? null;
-  const modifiers = [containerBackground(colors.bgCard, 'widget')];
-  if (nextRelease) modifiers.push(widgetURL(gameDeepLink(nextRelease.title)));
+  const colorWhite = '#FFFFFF';
+  const colorMuted = '#9AA3AF';
+  const colorBgCard = '#1C2129';
+  const colorOrange = '#F4820A';
+  const platformColors = { ps: '#003791', xbox: '#107C10', switch: '#E60012', pc: '#66C0F4' };
+
+  if (!nextRelease) {
+    return (
+      <VStack alignment="leading" spacing={4} modifiers={[padding({ all: 16 }), containerBackground(colorBgCard, 'widget')]}>
+        <Text modifiers={[font({ size: 15, weight: 'semibold' }), foregroundStyle(colorWhite)]}>
+          No upcoming releases
+        </Text>
+        <Text modifiers={[font({ size: 12 }), foregroundStyle(colorMuted)]}>
+          Add games to your Watchlist
+        </Text>
+      </VStack>
+    );
+  }
+
+  const accentPlatform = [...nextRelease.platforms].sort()[0];
+  const accentColor = platformColors[accentPlatform] || colorOrange;
+  const releaseDate = new Date(nextRelease.date[0], nextRelease.date[1], nextRelease.date[2]);
+  const deepLink = `gamingviews://game/${encodeURIComponent(nextRelease.title)}`;
 
   return (
-    <VStack modifiers={modifiers}>
-      <CountdownBlock nextRelease={nextRelease} />
+    <VStack
+      alignment="leading"
+      spacing={6}
+      modifiers={[padding({ all: 16 }), containerBackground(colorBgCard, 'widget'), widgetURL(deepLink)]}
+    >
+      <VStack modifiers={[frame({ width: 24, height: 4 }), background(accentColor), cornerRadius(2)]}>
+        <Spacer minLength={0} />
+      </VStack>
+      <Text modifiers={[font({ size: 16, weight: 'bold' }), foregroundStyle(colorWhite)]}>
+        {nextRelease.title}
+      </Text>
+      <Text date={releaseDate} dateStyle="relative" modifiers={[font({ size: 12 }), foregroundStyle(colorMuted)]} />
     </VStack>
   );
 });
