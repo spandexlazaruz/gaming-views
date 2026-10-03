@@ -149,13 +149,22 @@ module.exports = {
       // package's own Android support is explicitly experimental/
       // off-by-default per its own config-plugin type comment, so Android
       // uses the dedicated, mature react-native-android-widget instead.
+      //
+      // CORRECTED (caught reading the plugin's own source, withIosWidgets.js
+      // §30-32): `bundleIdentifier` here is the WIDGET EXTENSION target's own
+      // bundle id, passed straight through to its Xcode target and to EAS's
+      // appExtensions config (withEasConfig.js) - it must be distinct from
+      // the main app's bundle id, never equal to it (every target in an iOS
+      // app, main app or extension, needs its own unique bundle id; Xcode and
+      // App Store Connect both reject a collision). An earlier draft of this
+      // had it wrong (set to the main app's own id) before checking.
       // Needs a real App Group set up in the Apple Developer portal before
       // this can build for iOS - walk through together before the first
       // iOS widget build/submission.
       [
         'expo-widgets',
         {
-          bundleIdentifier: IS_DEV ? 'com.gamingviews.app.dev' : 'com.gamingviews.app',
+          bundleIdentifier: IS_DEV ? 'com.gamingviews.app.dev.widgets' : 'com.gamingviews.app.widgets',
           groupIdentifier: IS_DEV ? 'group.com.gamingviews.app.dev' : 'group.com.gamingviews.app',
           widgets: [
             {
