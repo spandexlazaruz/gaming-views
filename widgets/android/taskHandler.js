@@ -13,12 +13,22 @@ import { ThisWeekReleasesWidget } from './ThisWeekReleasesWidget';
 // lib/widgetBridge.js, which is what actually writes this key.
 const WIDGET_SUMMARY_CACHE_KEY = 'widget_summary_cache_v1';
 
-function renderFor(widgetName, summary) {
+// `width`/`height` (real on-screen dp, from WidgetInfo) are threaded through
+// to WatchlistCountdownWidget because its hero-image treatment needs
+// concrete pixel dimensions for ImageWidget (its imageWidth/imageHeight are
+// required numbers, not 'match_parent') - without the real size, a user who
+// resizes the widget larger than the configured default would get a
+// cropped/undersized background image.
+function renderFor(widgetInfo, summary) {
   const nextRelease = summary?.nextRelease ?? null;
   const thisWeek = summary?.thisWeek ?? [];
-  switch (widgetName) {
+  switch (widgetInfo.widgetName) {
     case 'WatchlistCountdown':
-      return React.createElement(WatchlistCountdownWidget, { nextRelease });
+      return React.createElement(WatchlistCountdownWidget, {
+        nextRelease,
+        width: widgetInfo.width,
+        height: widgetInfo.height,
+      });
     case 'ThisWeekReleases':
       return React.createElement(ThisWeekReleasesWidget, { nextRelease, thisWeek });
     default:
@@ -40,7 +50,7 @@ export function registerAndroidWidgetTaskHandler() {
       // "no upcoming releases" empty state CountdownBlock already shows.
     }
 
-    const element = renderFor(widgetInfo.widgetName, summary);
+    const element = renderFor(widgetInfo, summary);
     if (element) renderWidget(element);
   });
 }
