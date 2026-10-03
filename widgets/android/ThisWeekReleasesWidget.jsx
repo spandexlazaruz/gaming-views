@@ -1,9 +1,14 @@
 import React from 'react';
 import { FlexWidget, TextWidget, ListWidget } from 'react-native-android-widget';
-import { CountdownBlock } from './CountdownBlock';
+import { HeroCountdown } from './HeroCountdown';
 import { daysUntil, formatDateShort } from '../../lib/dates';
 import { gameDeepLink } from '../../lib/widgetData';
 import { colors, PLATFORMS } from '../../lib/theme';
+
+// Fixed height for the top hero band - the rest of the widget's height
+// (it's resizable by the user, no single fixed total) goes to the weekly
+// list below it.
+const HERO_BAND_HEIGHT = 110;
 
 function dayLabel(date) {
   const days = daysUntil(date);
@@ -41,13 +46,15 @@ function WeekRow({ game }) {
 }
 
 // The "ThisWeekReleases" widget (medium/large only - no small size, so this
-// never has to fit the countdown-only layout). Countdown block on top for
-// at-a-glance watchlist status, then every tracked game releasing in the
-// next 7 days below it, soonest first.
-export function ThisWeekReleasesWidget({ nextRelease, thisWeek }) {
+// never has to fit the countdown-only layout). Hero countdown band on top
+// for at-a-glance watchlist status (Dan's choice, matching
+// WatchlistCountdownWidget's same treatment rather than the plain
+// thumbnail layout this used to have), then every tracked game releasing
+// in the next 7 days below it, soonest first.
+export function ThisWeekReleasesWidget({ nextRelease, thisWeek, width }) {
   return (
     <FlexWidget style={{ height: 'match_parent', width: 'match_parent', backgroundColor: colors.bgCard, borderRadius: 16 }}>
-      <CountdownBlock nextRelease={nextRelease} />
+      <HeroCountdown nextRelease={nextRelease} width={width} height={HERO_BAND_HEIGHT} corners="top" />
       <FlexWidget style={{ width: 'match_parent', height: 1, backgroundColor: colors.line }} />
       {thisWeek.length === 0 ? (
         <FlexWidget style={{ width: 'match_parent', padding: 16, alignItems: 'flex-start' }}>

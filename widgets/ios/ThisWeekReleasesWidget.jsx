@@ -1,7 +1,7 @@
 import React from 'react';
 import { createWidget } from 'expo-widgets';
-import { VStack, HStack, Text, Divider, Link, Image } from '@expo/ui/swift-ui';
-import { containerBackground, foregroundStyle, background, cornerRadius, clipShape, resizable, aspectRatio, frame, font, padding, lineLimit } from '@expo/ui/swift-ui/modifiers';
+import { VStack, HStack, ZStack, Spacer, Text, Divider, Link, Image } from '@expo/ui/swift-ui';
+import { containerBackground, foregroundStyle, background, cornerRadius, resizable, aspectRatio, frame, font, padding, lineLimit } from '@expo/ui/swift-ui/modifiers';
 
 // The "ThisWeekReleases" widget (medium/large only, per app.config.js -
 // no small size, so it never has to fit the countdown-only layout).
@@ -54,6 +54,12 @@ export const thisWeekReleasesWidget = createWidget('ThisWeekReleases', (props, e
   const maxRows = environment.widgetFamily === 'systemLarge' ? 6 : 3;
   const visible = thisWeek.slice(0, maxRows);
 
+  // Both supported families here (medium/large) share the same widget
+  // width, only differing in height - see WatchlistCountdownWidget.jsx's
+  // own HERO_SIZES comment for why this is a fixed guess rather than a
+  // real measured value, and why that's fine with aspectRatio(fill).
+  const heroBandSize = { width: 329, height: 110 };
+
   const countdownBlock = !nextRelease ? (
     <VStack alignment="leading" spacing={4} modifiers={[padding({ all: 16 })]}>
       <Text modifiers={[font({ size: 15, weight: 'semibold' }), foregroundStyle(colorWhite)]}>
@@ -63,28 +69,43 @@ export const thisWeekReleasesWidget = createWidget('ThisWeekReleases', (props, e
         Add games to your Watchlist
       </Text>
     </VStack>
+  ) : !props.coverImageUri ? (
+    <VStack alignment="leading" spacing={6} modifiers={[padding({ all: 16 })]}>
+      <Text modifiers={[font({ size: 16, weight: 'bold' }), foregroundStyle(colorWhite), lineLimit(1)]}>
+        {nextRelease.title}
+      </Text>
+      <Text modifiers={[font({ size: 12 }), foregroundStyle(colorMuted), lineLimit(1)]}>
+        {countdownSubtitle(nextRelease.date)}
+      </Text>
+    </VStack>
   ) : (
-    <HStack spacing={12} modifiers={[padding({ all: 16 })]}>
-      {props.coverImageUri ? (
-        <Image
-          uiImage={props.coverImageUri}
-          modifiers={[
-            resizable(),
-            aspectRatio({ contentMode: 'fill' }),
-            frame({ width: 48, height: 64 }),
-            clipShape('roundedRectangle', 8),
-          ]}
-        />
-      ) : null}
-      <VStack alignment="leading" spacing={6}>
-        <Text modifiers={[font({ size: 16, weight: 'bold' }), foregroundStyle(colorWhite), lineLimit(1)]}>
+    <ZStack alignment="bottomLeading" modifiers={[frame(heroBandSize)]}>
+      <Image
+        uiImage={props.coverImageUri}
+        modifiers={[resizable(), aspectRatio({ contentMode: 'fill' }), frame(heroBandSize)]}
+      />
+      <VStack
+        modifiers={[
+          frame(heroBandSize),
+          background({
+            type: 'linearGradient',
+            colors: ['rgba(10, 12, 16, 0)', 'rgba(10, 12, 16, 0.92)'],
+            startPoint: { x: 0.5, y: 0 },
+            endPoint: { x: 0.5, y: 1 },
+          }),
+        ]}
+      >
+        <Spacer minLength={0} />
+      </VStack>
+      <VStack alignment="leading" spacing={6} modifiers={[padding({ all: 14 })]}>
+        <Text modifiers={[font({ size: 15, weight: 'bold' }), foregroundStyle(colorWhite), lineLimit(1)]}>
           {nextRelease.title}
         </Text>
-        <Text modifiers={[font({ size: 12 }), foregroundStyle(colorMuted), lineLimit(1)]}>
+        <Text modifiers={[font({ size: 11 }), foregroundStyle(colorMuted), lineLimit(1)]}>
           {countdownSubtitle(nextRelease.date)}
         </Text>
       </VStack>
-    </HStack>
+    </ZStack>
   );
 
   return (

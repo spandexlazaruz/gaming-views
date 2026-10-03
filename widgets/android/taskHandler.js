@@ -14,11 +14,12 @@ import { ThisWeekReleasesWidget } from './ThisWeekReleasesWidget';
 const WIDGET_SUMMARY_CACHE_KEY = 'widget_summary_cache_v1';
 
 // `width`/`height` (real on-screen dp, from WidgetInfo) are threaded through
-// to WatchlistCountdownWidget because its hero-image treatment needs
+// to both widgets because HeroCountdown's hero-image treatment needs
 // concrete pixel dimensions for ImageWidget (its imageWidth/imageHeight are
 // required numbers, not 'match_parent') - without the real size, a user who
 // resizes the widget larger than the configured default would get a
-// cropped/undersized background image.
+// cropped/undersized background image. ThisWeekReleases only needs width
+// (its hero band has its own fixed height, see HERO_BAND_HEIGHT).
 function renderFor(widgetInfo, summary) {
   const nextRelease = summary?.nextRelease ?? null;
   const thisWeek = summary?.thisWeek ?? [];
@@ -30,7 +31,7 @@ function renderFor(widgetInfo, summary) {
         height: widgetInfo.height,
       });
     case 'ThisWeekReleases':
-      return React.createElement(ThisWeekReleasesWidget, { nextRelease, thisWeek });
+      return React.createElement(ThisWeekReleasesWidget, { nextRelease, thisWeek, width: widgetInfo.width });
     default:
       return null;
   }
@@ -47,7 +48,7 @@ export function registerAndroidWidgetTaskHandler() {
     } catch {
       // No cache yet (e.g. widget added before the app has ever run) -
       // renderFor's nullish defaults below cover this with the same
-      // "no upcoming releases" empty state CountdownBlock already shows.
+      // "no upcoming releases" empty state HeroCountdown already shows.
     }
 
     const element = renderFor(widgetInfo, summary);
