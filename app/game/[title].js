@@ -249,7 +249,26 @@ export default function GameDetailScreen() {
   // `{ game: null }` when a title doesn't resolve, so calling it
   // unconditionally here is safe — it just won't contribute anything on a
   // genuinely nonexistent title.
-  const { game: detailGame, loading: detailLoading } = useGameLookup(decodedTitle, { enabled: !!decodedTitle });
+  // FIXED (real bug found via on-device testing - "Fable" resolving to
+  // completely unrelated games, including an indie title and a 1996
+  // Puzzle game, across different requests): a title-only lookup can't
+  // reliably disambiguate when IGDB has multiple real, distinct records
+  // sharing an exact title - even a hypes-based sort tie-break on the
+  // backend wasn't reliable, since ties on that field aren't guaranteed
+  // stable across requests. lightGame.igdbId (when present - every real
+  // IGDB-matched game has one, see mapIgdbGame's own comment) is passed
+  // through instead of relying on title matching at all - a genuinely
+  // unambiguous primary-key lookup. A Steam-only fallback game (no IGDB
+  // record - see buildLightweightGameFromSteam) has no igdbId and already
+  // carries its own desc/screenshots/coverHeroUrl straight from Steam, so
+  // this skips the detail fetch entirely for that case rather than risking
+  // a title-based lookup matching some unrelated IGDB game and overwriting
+  // perfectly good Steam data with noise.
+  const shouldFetchDetail = !lightGame || !!lightGame.igdbId;
+  const { game: detailGame, loading: detailLoading } = useGameLookup(decodedTitle, {
+    enabled: !!decodedTitle && shouldFetchDetail,
+    igdbId: lightGame?.igdbId,
+  });
   // FIXED (real bug found via on-device testing — "Fable" showing 1996's
   // Puzzle game data instead of the actual upcoming Fable reboot): this
   // used to spread the ENTIRE detailGame object on top of lightGame,
@@ -1014,9 +1033,22 @@ const styles = StyleSheet.create({
     width: '100%', aspectRatio: 16 / 9, borderRadius: 12, overflow: 'hidden',
     backgroundColor: colors.bgCard, borderWidth: 1, borderColor: colors.line,
   },
+  // FIXED (real bug found via on-device testing, confirmed with a
+  // temporary opaque-red diagnostic overlay — it only covered roughly the
+  // top third of the box, not the whole thing): spreading
+  // StyleSheet.absoluteFillObject (top/right/bottom/left: 0, which sizes
+  // this view implicitly by pinning all four edges) onto the same node as
+  // alignItems/justifyContent apparently hits a Yoga sizing quirk where it
+  // falls back to sizing the view to fit its content (here, just the small
+  // 54x54 button) instead of stretching edge-to-edge — same absoluteFill
+  // pattern as the sibling Image above it, which isn't affected since it
+  // has no alignItems/justifyContent of its own. Explicit width/height:
+  // '100%' is unambiguous regardless of that interaction, so this no
+  // longer relies on Yoga inferring size from the pinned edges at all.
   trailerPlayOverlay: {
-    ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center',
-    backgroundColor: 'red', // TEMPORARY diagnostic — should be 'rgba(0,0,0,0.25)'
+    position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
+    alignItems: 'center', justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.25)',
   },
   trailerPlayBtn: {
     width: 54, height: 54, borderRadius: 27, backgroundColor: 'rgba(10,12,16,0.75)',
