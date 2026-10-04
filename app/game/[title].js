@@ -250,12 +250,37 @@ export default function GameDetailScreen() {
   // unconditionally here is safe — it just won't contribute anything on a
   // genuinely nonexistent title.
   const { game: detailGame, loading: detailLoading } = useGameLookup(decodedTitle, { enabled: !!decodedTitle });
-  // Renders instantly from lightGame the moment it's available; detailGame's
-  // fields merge in on top a beat later once the lookup resolves. Every
-  // section below that needs screenshots/desc/videoId/coverHeroUrl already
-  // renders conditionally on field presence, so this reads as those
-  // sections appearing a moment after the rest of the page, not an error.
-  const game = lightGame ? { ...lightGame, ...(detailGame || {}) } : detailGame;
+  // FIXED (real bug found via on-device testing — "Fable" showing 1996's
+  // Puzzle game data instead of the actual upcoming Fable reboot): this
+  // used to spread the ENTIRE detailGame object on top of lightGame,
+  // trusting ?when=lookup (an exact IGDB name match, api/games.js's
+  // lookupGameByTitle) to always resolve to the same game lightGame
+  // already correctly identified. That assumption breaks for an ambiguous
+  // title IGDB has multiple exact-name matches for — lookupGameByTitle has
+  // no way to disambiguate, so `limit 1` can return a completely different
+  // game than the one the user actually navigated to. lightGame itself
+  // came from a list this app's own backend already vetted (the upcoming
+  // list, last-month, or a Steam-matched snapshot) via this exact title
+  // string, so it's the trustworthy source for a title's core identity.
+  // Only pulls the specific fields detailGame exists to add (desc,
+  // coverHeroUrl, screenshots, videoId - see the comment above) instead of
+  // the whole object, so even a wrong detailGame match can't corrupt
+  // date/platforms/genre/storeLinks/etc. that lightGame already had right
+  // - worst case with a wrong match is a mismatched trailer/screenshots/
+  // description, not a wrong release date for the game you actually opened.
+  const game = lightGame
+    ? {
+        ...lightGame,
+        ...(detailGame
+          ? {
+              desc: detailGame.desc,
+              coverHeroUrl: detailGame.coverHeroUrl,
+              screenshots: detailGame.screenshots,
+              videoId: detailGame.videoId,
+            }
+          : {}),
+      }
+    : detailGame;
   // Only wait on the detail fetch when there's no light match to render in
   // the meantime — once lightGame exists, the detail fetch finishing late
   // (or even failing) shouldn't block the page or show a loading spinner
@@ -991,7 +1016,7 @@ const styles = StyleSheet.create({
   },
   trailerPlayOverlay: {
     ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center',
-    backgroundColor: 'rgba(0,0,0,0.25)',
+    backgroundColor: 'red', // TEMPORARY diagnostic — should be 'rgba(0,0,0,0.25)'
   },
   trailerPlayBtn: {
     width: 54, height: 54, borderRadius: 27, backgroundColor: 'rgba(10,12,16,0.75)',
