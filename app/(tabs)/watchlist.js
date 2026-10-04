@@ -51,7 +51,7 @@ function withinReleaseGraceWindow(game, platformContext) {
 export default function WatchlistScreen() {
   const router = useRouter();
   const { games } = useGames();
-  const { saved, savedPlatforms, reminders, platformContext, savedGameSnapshots, toggleWatchlist, restoreWatchlistEntry } = useWatchlist();
+  const { saved, savedPlatforms, reminders, platformContext, savedGameSnapshots, externalGameSnapshots, toggleWatchlist, restoreWatchlistEntry } = useWatchlist();
   // The most recent swipe-removal still within its undo window, or null.
   // Single-slot deliberately — matches how most apps handle this (e.g.
   // Gmail's own archive-undo snackbar): swiping a second card before the
@@ -78,6 +78,17 @@ export default function WatchlistScreen() {
       .map((t) => {
         const live = games.find((g) => g.title === t);
         if (live) return live;
+        // ADDED (Steam wishlist auto-sync — "show every wishlisted game,
+        // regardless of date"): a Steam-sourced title can be outside
+        // `games` entirely by design (outside the normal 12-month
+        // upcoming window, or not an IGDB record at all — see
+        // lib/WatchlistContext.js's externalGameSnapshots for the full
+        // story). Checked before the savedGameSnapshots/grace-window
+        // fallback below on purpose — that one's gated to "released
+        // within the last 24h" and would wrongly drop a future-dated or
+        // stale-per-IGDB title that belongs here unconditionally.
+        const externalSnapshot = externalGameSnapshots[t];
+        if (externalSnapshot) return externalSnapshot;
         // Not in the live dataset anymore — fall back to the last-known
         // snapshot for up to 24 hours past its release date (see
         // withinReleaseGraceWindow above) rather than dropping it the
@@ -88,7 +99,7 @@ export default function WatchlistScreen() {
       })
       .filter(Boolean)
       .sort((a, b) => toDate(a.date) - toDate(b.date)),
-    [saved, games, savedGameSnapshots, platformContext]
+    [saved, games, savedGameSnapshots, externalGameSnapshots, platformContext]
   );
 
   const handleSwipeRemove = (title) => {
