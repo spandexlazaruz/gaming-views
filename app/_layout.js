@@ -112,6 +112,14 @@ export default Sentry.wrap(function RootLayout() {
                 <Stack.Screen name="settings" options={{ presentation: 'modal' }} />
                 <Stack.Screen name="notifications" options={{ presentation: 'modal' }} />
                 <Stack.Screen name="what-you-missed" options={{ presentation: 'modal' }} />
+                {/* ADDED (Steam deep-link callback fix - see
+                    app/steam-callback.js): transparentModal so this
+                    renders-null-then-redirects screen never shows a
+                    visible transition/flash - expo-router needs this to
+                    be a real registered route so it can match the
+                    gamingviews://steam-callback deep link instead of
+                    falling back to its own "Unmatched Route" screen. */}
+                <Stack.Screen name="steam-callback" options={{ presentation: 'transparentModal', animation: 'none' }} />
               </Stack>
             </SteamLinkProvider>
           </WatchlistProvider>
