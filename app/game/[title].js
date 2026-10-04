@@ -135,7 +135,7 @@ export default function GameDetailScreen() {
   const arrivedPlatform = Array.isArray(platform) ? platform[0] : platform;
   const router = useRouter();
   const { games, loading } = useGames();
-  const { saved, savedPlatforms, toggleWatchlist, reminders, setReminderLead, calendarAdded, markCalendarAdded } = useWatchlist();
+  const { saved, savedPlatforms, toggleWatchlist, reminders, setReminderLead, calendarAdded, markCalendarAdded, externalGameSnapshots } = useWatchlist();
   const [storePickerOpen, setStorePickerOpen] = useState(false);
   const [storeChecking, setStoreChecking] = useState(false);
   // ADDED (item 37 — add to calendar): idle | adding | denied — genuinely
@@ -211,6 +211,20 @@ export default function GameDetailScreen() {
   const needsLastMonthFallback = !loading && !primaryGame;
   const { games: lastMonthGames, loading: lastMonthLoading } = useLastMonthGames({ enabled: needsLastMonthFallback });
   const lastMonthGame = needsLastMonthFallback ? lastMonthGames.find((g) => g.title === decodedTitle) : undefined;
+  // ADDED (Steam wishlist auto-sync — "show every wishlisted game,
+  // regardless of date"): a Steam-sourced title can be outside `games`
+  // AND lastMonthGames both - either outside the normal 12-month upcoming
+  // window, or not an IGDB record at all (see
+  // lib/WatchlistContext.js's externalGameSnapshots for the full story).
+  // Without this, opening one of these from the Watchlist hit the same
+  // "Game not found" dead end item 42's fix (above) solved for already-
+  // released titles - primaryGame/lastMonthGame both resolve to nothing,
+  // and the IGDB-only ?when=lookup fallback below has nothing to find
+  // either for a Steam-only title. Checked last in the lightGame cascade,
+  // after the two list windows, since a title that's genuinely in one of
+  // those should always prefer that (fresher, matches how every other
+  // screen reads it).
+  const externalSnapshotGame = (!primaryGame && !lastMonthGame) ? externalGameSnapshots[decodedTitle] : undefined;
   // FIXED (Wolverine bug — "Game not found" for a title that already
   // released THIS calendar month): last-month's fixed window (see its own
   // comment above, and gaming-views-backend/api/games.js's buildQueryWindow)
@@ -221,7 +235,7 @@ export default function GameDetailScreen() {
   // date/platforms/cover thumbnail — enough for an instant first paint) is
   // still resolved from the two list windows only, same lazy cascade as
   // before.
-  const lightGame = primaryGame || lastMonthGame;
+  const lightGame = primaryGame || lastMonthGame || externalSnapshotGame;
 
   // ADDED (startup-performance fix): list-mode responses (useGames/
   // useLastMonthGames, i.e. lightGame above) no longer include desc/
