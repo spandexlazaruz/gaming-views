@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../lib/theme';
+import { useSteamLink } from '../lib/SteamLinkContext';
 
 function AccountRow({ icon, iconBg, name, statusLabel, statusColor, desc, children }) {
   return (
@@ -35,10 +36,22 @@ function NotifyBtn({ active, onPress }) {
   );
 }
 
+// Separate from NotifyBtn - link/unlink is a different kind of action than
+// a notify toggle, not just a different label on the same component.
+function SteamLinkBtn({ linked, linking, onPress }) {
+  return (
+    <Pressable style={[styles.actionBtn, linked ? styles.actionBtnGhost : null]} onPress={onPress} disabled={linking}>
+      <Text style={[styles.actionBtnText, linked && styles.actionBtnTextGhost]}>
+        {linking ? 'LINKING…' : linked ? 'UNLINK' : 'LINK ACCOUNT'}
+      </Text>
+    </Pressable>
+  );
+}
+
 export default function AccountsScreen() {
   const router = useRouter();
-  const [notifySteam, setNotifySteam] = useState(false);
   const [notifyXbox, setNotifyXbox] = useState(false);
+  const { steamId, linking, error, linkSteamAccount, unlinkSteamAccount } = useSteamLink();
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -58,11 +71,21 @@ export default function AccountsScreen() {
           icon="🎮"
           iconBg="rgba(102,192,244,0.16)"
           name="Steam"
-          statusLabel="COMING SOON"
-          statusColor={colors.orange}
-          desc="Real sign-in and wishlist import are in progress — not ready yet, but on the way."
+          statusLabel={steamId ? 'LINKED' : 'LINK ACCOUNT'}
+          statusColor={steamId ? colors.blue : colors.orange}
+          desc={
+            error
+              ? error
+              : steamId
+                ? "Synced with your Steam wishlist — new items are added to your Watchlist automatically."
+                : "Connect your Steam account and we'll keep your Watchlist in sync with your Steam wishlist."
+          }
         >
-          <NotifyBtn active={notifySteam} onPress={() => setNotifySteam(!notifySteam)} />
+          <SteamLinkBtn
+            linked={!!steamId}
+            linking={linking}
+            onPress={steamId ? unlinkSteamAccount : linkSteamAccount}
+          />
         </AccountRow>
 
         <AccountRow

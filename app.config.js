@@ -39,6 +39,9 @@ module.exports = {
     },
     plugins: [
       'expo-router',
+      // ADDED (Steam wishlist auto-sync): used for the Steam OpenID login
+      // flow (WebBrowser.openAuthSessionAsync) - no config options needed.
+      'expo-web-browser',
       // ADDED (home-screen widgets, Android build fix): forces a single
       // consistent androidx.work version across the whole dependency
       // graph - see plugins/withWorkManagerFix.js for the real build-log-
