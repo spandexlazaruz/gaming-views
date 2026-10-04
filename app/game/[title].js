@@ -704,7 +704,20 @@ export default function GameDetailScreen() {
                   // (play/pause, scrub, fullscreen), not get intercepted by
                   // this screen.
                   <WebView
-                    style={StyleSheet.absoluteFill}
+                    // FIXED (thin white line along the player's bottom edge,
+                    // also seen in the live build): youtubeEmbedHtml's own
+                    // CSS sets background:#000 on html/body, but that only
+                    // paints the HTML content area - a WebView's NATIVE
+                    // background (white by default on both iOS/Android)
+                    // shows through at any edge where the native view's
+                    // rounded pixel bounds don't exactly match the HTML
+                    // content's computed 100% height, a well-known
+                    // sub-pixel rounding gap with aspectRatio-driven
+                    // layouts like trailerBox. Setting the WebView's own
+                    // backgroundColor closes that gap regardless of
+                    // rounding, rather than relying on the embedded page's
+                    // CSS to cover 100% of the native view exactly.
+                    style={[StyleSheet.absoluteFill, { backgroundColor: '#000' }]}
                     originWhitelist={['*']}
                     source={{ html: youtubeEmbedHtml(game.videoId), baseUrl: EMBED_ORIGIN }}
                     allowsInlineMediaPlayback
