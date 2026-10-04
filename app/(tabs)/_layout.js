@@ -14,11 +14,11 @@ function TabIcon({ symbol, focused }) {
 }
 
 export default function TabsLayout() {
-  const { saved } = useWatchlist();
+  const { saved, externalGameSnapshots } = useWatchlist();
   const { games } = useGames();
   // Badge reflects what's actually visible on the Watchlist screen, not the
   // raw persisted count — see lib/watchlistUtils.js for why those can differ.
-  const watchlistCount = resolvedWatchlistCount(saved, games);
+  const watchlistCount = resolvedWatchlistCount(saved, games, externalGameSnapshots);
 
   // The fixed height/padding below used to bypass React Navigation's normal
   // automatic safe-area handling entirely, so on devices with a persistent
