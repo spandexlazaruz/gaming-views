@@ -77,8 +77,8 @@ export default function AccountsScreen() {
             error
               ? error
               : steamId
-                ? "Synced with your Steam wishlist — new items are added to your Watchlist automatically."
-                : "Connect your Steam account and we'll keep your Watchlist in sync with your Steam wishlist."
+                ? "Synced with your Steam wishlist — new items are added to your Watchlist automatically. Your wishlist must stay set to Public in Steam's privacy settings for syncing to keep working."
+                : "Connect your Steam account and we'll keep your Watchlist in sync with your Steam wishlist. Your Steam profile and wishlist need to be set to Public (Steam → Edit Profile → Privacy Settings) for us to read it."
           }
         >
           <SteamLinkBtn
