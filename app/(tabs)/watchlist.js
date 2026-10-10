@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, FlatList, Pressable, StyleSheet } from 'react-native';
+import { View, Text, FlatList, Pressable, StyleSheet, RefreshControl } from 'react-native';
 import { useRouter } from 'expo-router';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
 import { colors } from '../../lib/theme';
@@ -50,7 +50,7 @@ function withinReleaseGraceWindow(game, platformContext) {
 
 export default function WatchlistScreen() {
   const router = useRouter();
-  const { games } = useGames();
+  const { games, refetch } = useGames();
   const { saved, savedPlatforms, reminders, platformContext, savedGameSnapshots, externalGameSnapshots, toggleWatchlist, restoreWatchlistEntry } = useWatchlist();
   // The most recent swipe-removal still within its undo window, or null.
   // Single-slot deliberately — matches how most apps handle this (e.g.
@@ -58,6 +58,20 @@ export default function WatchlistScreen() {
   // first's window closes replaces the offer rather than stacking toasts.
   const [recentlyRemoved, setRecentlyRemoved] = useState(null); // { title, snapshot }
   const undoTimer = useRef(null);
+  // ADDED (pull-to-refresh, local not shared) — see app/(tabs)/index.js's
+  // matching comment for the real stuck-spinner bug this avoids: sharing
+  // GamesContext's own `refreshing` flag across both tab screens left a
+  // frozen native spinner on whichever tab wasn't the one pulled, since
+  // React Navigation freezes the inactive tab rather than unmounting it.
+  const [refreshing, setRefreshing] = useState(false);
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await refetch();
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   useEffect(() => () => {
     if (undoTimer.current) clearTimeout(undoTimer.current);
@@ -168,6 +182,14 @@ export default function WatchlistScreen() {
           )}
           contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
           showsVerticalScrollIndicator={false}
+          // ADDED (pull-to-refresh): local `refreshing`/handleRefresh (see
+          // above), not GamesContext's own flag. Pulling here re-fetches the
+          // shared `games` list via `refetch`, which is what actually drives
+          // SteamLinkContext's sync effect (keyed on `games`) — the only
+          // screen-level trigger for it between cold starts.
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.orange} />
+          }
           initialNumToRender={8}
           maxToRenderPerBatch={8}
           windowSize={7}
