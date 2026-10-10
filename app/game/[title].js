@@ -135,7 +135,7 @@ export default function GameDetailScreen() {
   const arrivedPlatform = Array.isArray(platform) ? platform[0] : platform;
   const router = useRouter();
   const { games, loading } = useGames();
-  const { saved, savedPlatforms, toggleWatchlist, reminders, setReminderLead, calendarAdded, markCalendarAdded } = useWatchlist();
+  const { saved, savedPlatforms, toggleWatchlist, reminders, setReminderLead, calendarAdded, markCalendarAdded, externalGameSnapshots } = useWatchlist();
   const [storePickerOpen, setStorePickerOpen] = useState(false);
   const [storeChecking, setStoreChecking] = useState(false);
   // ADDED (item 37 — add to calendar): idle | adding | denied — genuinely
@@ -211,6 +211,20 @@ export default function GameDetailScreen() {
   const needsLastMonthFallback = !loading && !primaryGame;
   const { games: lastMonthGames, loading: lastMonthLoading } = useLastMonthGames({ enabled: needsLastMonthFallback });
   const lastMonthGame = needsLastMonthFallback ? lastMonthGames.find((g) => g.title === decodedTitle) : undefined;
+  // ADDED (Steam wishlist auto-sync — "show every wishlisted game,
+  // regardless of date"): a Steam-sourced title can be outside `games`
+  // AND lastMonthGames both - either outside the normal 12-month upcoming
+  // window, or not an IGDB record at all (see
+  // lib/WatchlistContext.js's externalGameSnapshots for the full story).
+  // Without this, opening one of these from the Watchlist hit the same
+  // "Game not found" dead end item 42's fix (above) solved for already-
+  // released titles - primaryGame/lastMonthGame both resolve to nothing,
+  // and the IGDB-only ?when=lookup fallback below has nothing to find
+  // either for a Steam-only title. Checked last in the lightGame cascade,
+  // after the two list windows, since a title that's genuinely in one of
+  // those should always prefer that (fresher, matches how every other
+  // screen reads it).
+  const externalSnapshotGame = (!primaryGame && !lastMonthGame) ? externalGameSnapshots[decodedTitle] : undefined;
   // FIXED (Wolverine bug — "Game not found" for a title that already
   // released THIS calendar month): last-month's fixed window (see its own
   // comment above, and gaming-views-backend/api/games.js's buildQueryWindow)
@@ -221,7 +235,7 @@ export default function GameDetailScreen() {
   // date/platforms/cover thumbnail — enough for an instant first paint) is
   // still resolved from the two list windows only, same lazy cascade as
   // before.
-  const lightGame = primaryGame || lastMonthGame;
+  const lightGame = primaryGame || lastMonthGame || externalSnapshotGame;
 
   // ADDED (startup-performance fix): list-mode responses (useGames/
   // useLastMonthGames, i.e. lightGame above) no longer include desc/
@@ -235,13 +249,57 @@ export default function GameDetailScreen() {
   // `{ game: null }` when a title doesn't resolve, so calling it
   // unconditionally here is safe — it just won't contribute anything on a
   // genuinely nonexistent title.
-  const { game: detailGame, loading: detailLoading } = useGameLookup(decodedTitle, { enabled: !!decodedTitle });
-  // Renders instantly from lightGame the moment it's available; detailGame's
-  // fields merge in on top a beat later once the lookup resolves. Every
-  // section below that needs screenshots/desc/videoId/coverHeroUrl already
-  // renders conditionally on field presence, so this reads as those
-  // sections appearing a moment after the rest of the page, not an error.
-  const game = lightGame ? { ...lightGame, ...(detailGame || {}) } : detailGame;
+  // FIXED (real bug found via on-device testing - "Fable" resolving to
+  // completely unrelated games, including an indie title and a 1996
+  // Puzzle game, across different requests): a title-only lookup can't
+  // reliably disambiguate when IGDB has multiple real, distinct records
+  // sharing an exact title - even a hypes-based sort tie-break on the
+  // backend wasn't reliable, since ties on that field aren't guaranteed
+  // stable across requests. lightGame.igdbId (when present - every real
+  // IGDB-matched game has one, see mapIgdbGame's own comment) is passed
+  // through instead of relying on title matching at all - a genuinely
+  // unambiguous primary-key lookup. A Steam-only fallback game (no IGDB
+  // record - see buildLightweightGameFromSteam) has no igdbId and already
+  // carries its own desc/screenshots/coverHeroUrl straight from Steam, so
+  // this skips the detail fetch entirely for that case rather than risking
+  // a title-based lookup matching some unrelated IGDB game and overwriting
+  // perfectly good Steam data with noise.
+  const shouldFetchDetail = !lightGame || !!lightGame.igdbId;
+  const { game: detailGame, loading: detailLoading } = useGameLookup(decodedTitle, {
+    enabled: !!decodedTitle && shouldFetchDetail,
+    igdbId: lightGame?.igdbId,
+  });
+  // FIXED (real bug found via on-device testing — "Fable" showing 1996's
+  // Puzzle game data instead of the actual upcoming Fable reboot): this
+  // used to spread the ENTIRE detailGame object on top of lightGame,
+  // trusting ?when=lookup (an exact IGDB name match, api/games.js's
+  // lookupGameByTitle) to always resolve to the same game lightGame
+  // already correctly identified. That assumption breaks for an ambiguous
+  // title IGDB has multiple exact-name matches for — lookupGameByTitle has
+  // no way to disambiguate, so `limit 1` can return a completely different
+  // game than the one the user actually navigated to. lightGame itself
+  // came from a list this app's own backend already vetted (the upcoming
+  // list, last-month, or a Steam-matched snapshot) via this exact title
+  // string, so it's the trustworthy source for a title's core identity.
+  // Only pulls the specific fields detailGame exists to add (desc,
+  // coverHeroUrl, screenshots, videoId - see the comment above) instead of
+  // the whole object, so even a wrong detailGame match can't corrupt
+  // date/platforms/genre/storeLinks/etc. that lightGame already had right
+  // - worst case with a wrong match is a mismatched trailer/screenshots/
+  // description, not a wrong release date for the game you actually opened.
+  const game = lightGame
+    ? {
+        ...lightGame,
+        ...(detailGame
+          ? {
+              desc: detailGame.desc,
+              coverHeroUrl: detailGame.coverHeroUrl,
+              screenshots: detailGame.screenshots,
+              videoId: detailGame.videoId,
+            }
+          : {}),
+      }
+    : detailGame;
   // Only wait on the detail fetch when there's no light match to render in
   // the meantime — once lightGame exists, the detail fetch finishing late
   // (or even failing) shouldn't block the page or show a loading spinner
@@ -690,7 +748,20 @@ export default function GameDetailScreen() {
                   // (play/pause, scrub, fullscreen), not get intercepted by
                   // this screen.
                   <WebView
-                    style={StyleSheet.absoluteFill}
+                    // FIXED (thin white line along the player's bottom edge,
+                    // also seen in the live build): youtubeEmbedHtml's own
+                    // CSS sets background:#000 on html/body, but that only
+                    // paints the HTML content area - a WebView's NATIVE
+                    // background (white by default on both iOS/Android)
+                    // shows through at any edge where the native view's
+                    // rounded pixel bounds don't exactly match the HTML
+                    // content's computed 100% height, a well-known
+                    // sub-pixel rounding gap with aspectRatio-driven
+                    // layouts like trailerBox. Setting the WebView's own
+                    // backgroundColor closes that gap regardless of
+                    // rounding, rather than relying on the embedded page's
+                    // CSS to cover 100% of the native view exactly.
+                    style={[StyleSheet.absoluteFill, { backgroundColor: '#000' }]}
                     originWhitelist={['*']}
                     source={{ html: youtubeEmbedHtml(game.videoId), baseUrl: EMBED_ORIGIN }}
                     allowsInlineMediaPlayback
@@ -962,8 +1033,21 @@ const styles = StyleSheet.create({
     width: '100%', aspectRatio: 16 / 9, borderRadius: 12, overflow: 'hidden',
     backgroundColor: colors.bgCard, borderWidth: 1, borderColor: colors.line,
   },
+  // FIXED (real bug found via on-device testing, confirmed with a
+  // temporary opaque-red diagnostic overlay — it only covered roughly the
+  // top third of the box, not the whole thing): spreading
+  // StyleSheet.absoluteFillObject (top/right/bottom/left: 0, which sizes
+  // this view implicitly by pinning all four edges) onto the same node as
+  // alignItems/justifyContent apparently hits a Yoga sizing quirk where it
+  // falls back to sizing the view to fit its content (here, just the small
+  // 54x54 button) instead of stretching edge-to-edge — same absoluteFill
+  // pattern as the sibling Image above it, which isn't affected since it
+  // has no alignItems/justifyContent of its own. Explicit width/height:
+  // '100%' is unambiguous regardless of that interaction, so this no
+  // longer relies on Yoga inferring size from the pinned edges at all.
   trailerPlayOverlay: {
-    ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center',
+    position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
+    alignItems: 'center', justifyContent: 'center',
     backgroundColor: 'rgba(0,0,0,0.25)',
   },
   trailerPlayBtn: {

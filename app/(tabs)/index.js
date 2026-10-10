@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
-import { View, Text, SectionList, ScrollView, Pressable, StyleSheet } from 'react-native';
+import { View, Text, SectionList, ScrollView, Pressable, StyleSheet, RefreshControl } from 'react-native';
 import { useRouter } from 'expo-router';
 import { colors, PLATFORMS, GENRES } from '../../lib/theme';
 import { useGames } from '../../lib/GamesContext';
@@ -58,6 +58,26 @@ function pickRecommended(games) {
 export default function CalendarScreen() {
   const router = useRouter();
   const { games, loading, error, refetch } = useGames();
+  // ADDED (pull-to-refresh, local not shared): a REAL bug found via on-
+  // device testing — this was originally wired to GamesContext's own
+  // `refreshing` flag, shared across both tab screens. React Navigation's
+  // tab navigator keeps the inactive tab mounted-but-frozen rather than
+  // unmounting it, so a refresh triggered on the OTHER tab flipped this
+  // screen's RefreshControl true-then-false while it was frozen in the
+  // background — the native spinner can't animate while frozen, so it
+  // reappeared stuck on next visit, only resolving once a real drag gesture
+  // forced the native control to resync. Fixed by making this purely local,
+  // driven only by this screen's own pull gesture, never by a fetch started
+  // elsewhere.
+  const [refreshing, setRefreshing] = useState(false);
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await refetch();
+    } finally {
+      setRefreshing(false);
+    }
+  };
   const { saved, toggleWatchlist, preferredPlatforms, preferredGenres, hydrated } = useWatchlist();
   // FIXED 2026-09-08, revised 2026-09-08 (item 29): the previous attempt
   // seeded activePlatform/activeGenre via an effect keyed only on
@@ -223,7 +243,15 @@ export default function CalendarScreen() {
     );
   }
 
-  if (error) {
+  // ADDED (pull-to-refresh): only take over the full screen for an error
+  // when there's nothing to show instead — a failed FIRST load, matching
+  // the original behavior. A failed pull-to-refresh of an already-populated
+  // list sets this same `error` from GamesContext, but must NOT blank the
+  // list that's still good — same category of bug as the frozen-spinner fix
+  // above (a transient refresh problem taking over content that's still
+  // valid). Matches this app's existing "best-effort, fail silently" posture
+  // for background syncs elsewhere (see SteamLinkContext.js).
+  if (error && games.length === 0) {
     return (
       <View style={styles.container}>
         <ErrorState message={error} onRetry={refetch} />
@@ -374,6 +402,16 @@ export default function CalendarScreen() {
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
         stickySectionHeadersEnabled={false}
+        // ADDED (pull-to-refresh): local `refreshing`/handleRefresh (see
+        // above) rather than GamesContext's own `refreshing` flag — kept
+        // scoped to this screen's own gesture so it can't get stuck showing
+        // a frozen spinner from a refresh the OTHER tab triggered. Still the
+        // only way SteamLinkContext's sync effect (keyed on `games`) fires
+        // between cold starts, since there's no AppState/interval trigger
+        // elsewhere.
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.orange} />
+        }
         // Rendering tuning — keeps memory bounded even with hundreds of cards.
         initialNumToRender={8}
         maxToRenderPerBatch={8}

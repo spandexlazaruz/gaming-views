@@ -9,6 +9,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ScreenOrientation from 'expo-screen-orientation';
 import { WatchlistProvider } from '../lib/WatchlistContext';
 import { GamesProvider } from '../lib/GamesContext';
+import { SteamLinkProvider } from '../lib/SteamLinkContext';
 import { recordAppOpenDay } from '../lib/reviewPrompt';
 import { colors } from '../lib/theme';
 import * as Sentry from '@sentry/react-native';
@@ -99,18 +100,28 @@ export default Sentry.wrap(function RootLayout() {
       ) : (
         <GamesProvider>
           <WatchlistProvider>
-            <StatusBar style="light" />
-            <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bgPage } }}>
-              <Stack.Screen name="(tabs)" />
-              <Stack.Screen name="onboarding" options={{ presentation: 'fullScreenModal' }} />
-              <Stack.Screen name="game/[title]" options={{ presentation: 'modal' }} />
-              <Stack.Screen name="search" options={{ presentation: 'modal' }} />
-              <Stack.Screen name="menu" options={{ presentation: 'modal' }} />
-              <Stack.Screen name="accounts" options={{ presentation: 'modal' }} />
-              <Stack.Screen name="settings" options={{ presentation: 'modal' }} />
-              <Stack.Screen name="notifications" options={{ presentation: 'modal' }} />
-              <Stack.Screen name="what-you-missed" options={{ presentation: 'modal' }} />
-            </Stack>
+            <SteamLinkProvider>
+              <StatusBar style="light" />
+              <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bgPage } }}>
+                <Stack.Screen name="(tabs)" />
+                <Stack.Screen name="onboarding" options={{ presentation: 'fullScreenModal' }} />
+                <Stack.Screen name="game/[title]" options={{ presentation: 'modal' }} />
+                <Stack.Screen name="search" options={{ presentation: 'modal' }} />
+                <Stack.Screen name="menu" options={{ presentation: 'modal' }} />
+                <Stack.Screen name="accounts" options={{ presentation: 'modal' }} />
+                <Stack.Screen name="settings" options={{ presentation: 'modal' }} />
+                <Stack.Screen name="notifications" options={{ presentation: 'modal' }} />
+                <Stack.Screen name="what-you-missed" options={{ presentation: 'modal' }} />
+                {/* ADDED (Steam deep-link callback fix - see
+                    app/steam-callback.js): transparentModal so this
+                    renders-null-then-redirects screen never shows a
+                    visible transition/flash - expo-router needs this to
+                    be a real registered route so it can match the
+                    gamingviews://steam-callback deep link instead of
+                    falling back to its own "Unmatched Route" screen. */}
+                <Stack.Screen name="steam-callback" options={{ presentation: 'transparentModal', animation: 'none' }} />
+              </Stack>
+            </SteamLinkProvider>
           </WatchlistProvider>
         </GamesProvider>
       )}

@@ -8,13 +8,13 @@ import { colors } from '../lib/theme';
 
 export default function QuickNavBar() {
   const router = useRouter();
-  const { saved } = useWatchlist();
+  const { saved, externalGameSnapshots } = useWatchlist();
   const { games } = useGames();
   // Same fix as app/(tabs)/_layout.js's tab badge — this bar is a separate,
   // manually-built component (not the shared Tabs navigator), so it had its
   // own independent copy of the stale-count bug. Keep both in sync if this
   // logic ever changes again.
-  const watchlistCount = resolvedWatchlistCount(saved, games);
+  const watchlistCount = resolvedWatchlistCount(saved, games, externalGameSnapshots);
 
   return (
     <SafeAreaView edges={['bottom']} style={{ backgroundColor: colors.bgNav }}>
