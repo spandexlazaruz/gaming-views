@@ -92,7 +92,7 @@ export default function SettingsScreen() {
         />
         <SwitchRow
           title="Steam Price Drops (Coming Soon)"
-          desc="Needs real Steam pricing data, which isn't wired up yet — see Accounts. Off until that's real."
+          desc="Steam wishlist sync is live — link your account under Accounts. Price-drop alerts need real Steam pricing data, which isn't wired up yet."
           value={false}
           onValueChange={() => {}}
           disabled
